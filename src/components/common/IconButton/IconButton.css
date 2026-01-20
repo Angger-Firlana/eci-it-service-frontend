@@ -1,0 +1,17 @@
+.icon-button {
+  border: 0;
+  background: transparent;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.icon-button:hover {
+  background-color: #EFF3FF;
+}
+
+.icon-button-img {
+  object-fit: contain;
+}

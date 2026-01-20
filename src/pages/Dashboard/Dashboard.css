@@ -1,0 +1,6 @@
+.dashboard-container {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-bottom: 24px;
+}

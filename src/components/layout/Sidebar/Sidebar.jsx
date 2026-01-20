@@ -1,0 +1,75 @@
+import React, { useState, useEffect } from 'react';
+import './Sidebar.css';
+import { USER_MENU_ITEMS } from '../../../constants';
+import logoImg from '../../../assets/images/logo-removebg-preview.png';
+import sidebarIcon from '../../../assets/icons/sidebar.svg';
+
+const Sidebar = ({ activeRoute, onNavigate, isCollapsed, onToggle }) => {
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = windowWidth <= 520;
+  const isTablet = windowWidth <= 900 && windowWidth > 520;
+
+  const showLabel = !isTablet && (!isMobile || !isCollapsed);
+
+  return (
+    <aside
+      className={`sidebar ${isMobile && isCollapsed ? 'sidebar-mini' : ''} ${
+        isMobile && !isCollapsed ? 'sidebar-drawer-open' : ''
+      } ${isTablet ? 'sidebar-compact' : ''}`}
+    >
+      {/* Logo Section */}
+      <div className="sidebar-top">
+        {isMobile && (
+          <button
+            className="burger"
+            onClick={onToggle}
+            aria-label="Toggle sidebar"
+            title="Menu"
+          >
+            <img src={sidebarIcon} alt="menu" className="burger-icon" />
+          </button>
+        )}
+        {(!isMobile || !isCollapsed) && (
+          <img src={logoImg} alt="Logo" className="sidebar-logo" />
+        )}
+      </div>
+
+      {/* Navigation Menu */}
+      <nav className="nav">
+        {USER_MENU_ITEMS.map((item) => {
+          const isActive = activeRoute === item.route;
+
+          return (
+            <a
+              key={item.id}
+              href="#"
+              className={`nav-item ${isActive ? 'active' : ''} ${
+                isTablet || (isMobile && isCollapsed) ? 'nav-item-centered' : ''
+              }`}
+              onClick={(e) => {
+                e.preventDefault();
+                onNavigate(item.route);
+              }}
+            >
+              <img
+                src={isActive ? item.iconActive : item.icon}
+                alt={item.label}
+                className="nav-icon"
+              />
+              {showLabel && <span className="nav-label">{item.label}</span>}
+            </a>
+          );
+        })}
+      </nav>
+    </aside>
+  );
+};
+
+export default Sidebar;

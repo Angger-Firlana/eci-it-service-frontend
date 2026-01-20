@@ -1,0 +1,26 @@
+.avatar {
+  background-color: #e9eefc;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  user-select: none;
+}
+
+.avatar-text {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  color: #3b4a7a;
+}
+
+.avatar-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 999px;
+}
+
+.avatar-button:hover .avatar {
+  opacity: 0.9;
+}
