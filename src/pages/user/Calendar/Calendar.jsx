@@ -5,6 +5,7 @@ const Calendar = () => {
   const daysInMonth = 31;
   const startDayIndex = 4;
   const selectedDay = 17;
+  const eventDates = [17]; // Days that have events
 
   const days = useMemo(() => {
     const blanks = Array.from({ length: startDayIndex }, () => null);
@@ -35,16 +36,19 @@ const Calendar = () => {
           </div>
 
           <div className="calendar-days">
-            {days.map((day, index) => (
-              <div
-                key={`${day || 'empty'}-${index}`}
-                className={`calendar-day ${
-                  day === selectedDay ? 'selected' : ''
-                } ${day ? '' : 'empty'}`}
-              >
-                {day || ''}
-              </div>
-            ))}
+            {days.map((day, index) => {
+              const hasEvent = day && eventDates.includes(day);
+              return (
+                <div
+                  key={`${day || 'empty'}-${index}`}
+                  className={`calendar-day ${
+                    day === selectedDay ? 'selected' : ''
+                  } ${day ? '' : 'empty'} ${hasEvent ? 'has-event' : ''}`}
+                >
+                  {day || ''}
+                </div>
+              );
+            })}
           </div>
         </section>
 
