@@ -256,33 +256,36 @@ const CreateRequest = () => {
         <div className="confirm-grid">
           <section className="request-card confirm-card">
             <div className="card-title">Konfirmasi Request</div>
-            <div className="confirm-photo-block">
-              <div className="confirm-label">Foto Perangkat</div>
-              <div className="confirm-photo">
-                {form.photoName ? form.photoName : 'Foto Perangkat'}
-              </div>
-            </div>
 
-            <div className="confirm-rows">
-              <div className="confirm-row">
-                <span className="confirm-key">Perangkat</span>
-                <span className="confirm-value">{form.deviceType}</span>
+            <div className="confirm-main">
+              <div className="confirm-photo-block">
+                <div className="confirm-label">Foto Perangkat</div>
+                <div className="confirm-photo">
+                  {form.photoName ? form.photoName : 'Foto Perangkat'}
+                </div>
               </div>
-              <div className="confirm-row">
-                <span className="confirm-key">Merk</span>
-                <span className="confirm-value">{form.brand}</span>
-              </div>
-              <div className="confirm-row">
-                <span className="confirm-key">Model</span>
-                <span className="confirm-value">{form.model}</span>
-              </div>
-              <div className="confirm-row">
-                <span className="confirm-key">Jenis Service</span>
-                <span className="confirm-value">{form.serviceType}</span>
-              </div>
-              <div className="confirm-row">
-                <span className="confirm-key">Serial Number</span>
-                <span className="confirm-value">{form.serialNumber}</span>
+
+              <div className="confirm-rows">
+                <div className="confirm-row">
+                  <span className="confirm-key">Perangkat</span>
+                  <span className="confirm-value">{form.deviceType}</span>
+                </div>
+                <div className="confirm-row">
+                  <span className="confirm-key">Merk</span>
+                  <span className="confirm-value">{form.brand}</span>
+                </div>
+                <div className="confirm-row">
+                  <span className="confirm-key">Model</span>
+                  <span className="confirm-value">{form.model}</span>
+                </div>
+                <div className="confirm-row">
+                  <span className="confirm-key">Jenis Service</span>
+                  <span className="confirm-value">{form.serviceType}</span>
+                </div>
+                <div className="confirm-row">
+                  <span className="confirm-key">Serial Number</span>
+                  <span className="confirm-value">{form.serialNumber}</span>
+                </div>
               </div>
             </div>
 
