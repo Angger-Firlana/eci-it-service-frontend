@@ -1,1 +1,20 @@
-/* App styles - currently empty, add global app styles here if needed */
+.app-placeholder {
+  background: #ffffff;
+  border: 1px dashed #D9D9D9;
+  border-radius: 11px;
+  padding: 20px 24px;
+  color: #6b6b6b;
+  font-family: 'Poppins', sans-serif;
+}
+
+.app-placeholder h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  color: #0b1220;
+  font-weight: 600;
+}
+
+.app-placeholder p {
+  margin: 0;
+  font-size: 13px;
+}

@@ -1,0 +1,35 @@
+.app {
+  min-height: 100vh;
+  padding: 18px;
+  display: grid;
+  grid-template-columns: var(--sidebarWide) 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+.main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+@media (max-width: 900px) {
+  .app {
+    grid-template-columns: var(--sidebarCompact) 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .app {
+    grid-template-columns: var(--sidebarMini) 1fr;
+    padding: 14px;
+  }
+}

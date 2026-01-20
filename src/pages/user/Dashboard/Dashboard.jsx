@@ -1,17 +1,7 @@
 import React from 'react';
 import './Dashboard.css';
-import Layout from '../../../layouts/Layout/Layout';
 import HeroSection from '../../../components/user/dashboard/HeroSection/HeroSection';
 import RequestList from '../../../components/user/dashboard/RequestList/RequestList';
-import { USER_MENU_ITEMS } from '../../../constants';
-
-// Dummy data for user
-const dummyUser = {
-  name: 'Toni Apalah',
-  email: 'Toni@gmail.com',
-  role: 'User',
-  department: 'ECOMERS',
-};
 
 // Dummy data for requests
 const dummyRequests = [
@@ -45,12 +35,7 @@ const dummyRequests = [
   },
 ];
 
-const Dashboard = () => {
-  const handleNavigate = (route) => {
-    console.log('Navigate to:', route);
-    // TODO: Implement navigation logic
-  };
-
+const Dashboard = ({ user }) => {
   const handleViewAll = () => {
     console.log('View all requests');
     // TODO: Navigate to service list page
@@ -62,24 +47,17 @@ const Dashboard = () => {
   };
 
   return (
-    <Layout
-      activeRoute="/dashboard"
-      onNavigate={handleNavigate}
-      user={dummyUser}
-      menuItems={USER_MENU_ITEMS}
-    >
-      <div className="dashboard-container">
-        {/* Hero Section */}
-        <HeroSection user={dummyUser} />
+    <div className="dashboard-container">
+      {/* Hero Section */}
+      <HeroSection user={user} />
 
-        {/* Recent Requests */}
-        <RequestList
-          requests={dummyRequests}
-          onViewAll={handleViewAll}
-          onViewDetails={handleViewDetails}
-        />
-      </div>
-    </Layout>
+      {/* Recent Requests */}
+      <RequestList
+        requests={dummyRequests}
+        onViewAll={handleViewAll}
+        onViewDetails={handleViewDetails}
+      />
+    </div>
   );
 };
 
