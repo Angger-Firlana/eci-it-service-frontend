@@ -19,14 +19,15 @@
   padding: 0 18px;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  min-height: 44px;
+  justify-content: center;
+  min-height: 76px;
 }
 
 .sidebar-logo {
-  width: 120px;
-  height: 40px;
+  width: 190px;
+  height: 64px;
   object-fit: contain;
+  display: block;
 }
 
 .burger {

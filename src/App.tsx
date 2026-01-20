@@ -1,7 +1,7 @@
-import Dashboard from './pages/Dashboard/Dashboard';
+import UserDashboard from './pages/user/Dashboard/Dashboard';
 
 function App() {
-  return <Dashboard />;
+  return <UserDashboard />;
 }
 
 export default App;

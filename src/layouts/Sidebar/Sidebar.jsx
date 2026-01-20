@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import './Sidebar.css';
-import { USER_MENU_ITEMS } from '../../../constants';
-import logoImg from '../../../assets/images/logo-removebg-preview.png';
-import sidebarIcon from '../../../assets/icons/sidebar.svg';
+import { USER_MENU_ITEMS } from '../../constants';
+import logoImg from '../../assets/images/logo-removebg-preview.png';
+import sidebarIcon from '../../assets/icons/sidebar.svg';
 
-const Sidebar = ({ activeRoute, onNavigate, isCollapsed, onToggle }) => {
+const Sidebar = ({
+  activeRoute,
+  onNavigate,
+  isCollapsed,
+  onToggle,
+  menuItems = USER_MENU_ITEMS,
+}) => {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
   useEffect(() => {
@@ -43,7 +49,7 @@ const Sidebar = ({ activeRoute, onNavigate, isCollapsed, onToggle }) => {
 
       {/* Navigation Menu */}
       <nav className="nav">
-        {USER_MENU_ITEMS.map((item) => {
+        {menuItems.map((item) => {
           const isActive = activeRoute === item.route;
 
           return (

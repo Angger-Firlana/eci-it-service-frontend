@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './Topbar.css';
-import Avatar from '../../common/Avatar/Avatar';
+import Avatar from '../../components/common/Avatar/Avatar';
 
 const Topbar = ({ user }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);

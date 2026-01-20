@@ -3,12 +3,12 @@
   width: 100%;
   border-radius: 11px;
   background: #EAEAEA;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .eye-tile {
   position: absolute;
-  right: 0;
+  right: -10px;
   top: 0;
   height: 100%;
   width: calc(64px + 18px);
@@ -24,7 +24,7 @@
 
 .eye-btn {
   position: absolute;
-  right: 14px;
+  right: -6px;
   top: 50%;
   transform: translateY(-50%) scale(0.96);
   width: 44px;

@@ -1,6 +1,6 @@
 import React from 'react';
 import './HeroSection.css';
-import maskotImg from '../../../assets/images/maskot-eci-rmeove 1.png';
+import maskotImg from '../../../../assets/images/maskot-eci-rmeove 1.png';
 
 const HeroSection = ({ user }) => {
   return (

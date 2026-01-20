@@ -1,7 +1,7 @@
 import React from 'react';
 import './RequestItem.css';
-import Badge from '../../common/Badge/Badge';
-import eyeIcon from '../../../assets/icons/lihatdetail(eye).svg';
+import Badge from '../../../common/Badge/Badge';
+import eyeIcon from '../../../../assets/icons/lihatdetail(eye).svg';
 
 const RequestItem = ({ item, onViewDetails }) => {
   const getStatusVariant = (status) => {

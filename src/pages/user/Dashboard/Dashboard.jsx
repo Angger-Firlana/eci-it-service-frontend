@@ -1,8 +1,9 @@
 import React from 'react';
 import './Dashboard.css';
-import Layout from '../../components/layout/Layout/Layout';
-import HeroSection from '../../components/dashboard/HeroSection/HeroSection';
-import RequestList from '../../components/dashboard/RequestList/RequestList';
+import Layout from '../../../layouts/Layout/Layout';
+import HeroSection from '../../../components/user/dashboard/HeroSection/HeroSection';
+import RequestList from '../../../components/user/dashboard/RequestList/RequestList';
+import { USER_MENU_ITEMS } from '../../../constants';
 
 // Dummy data for user
 const dummyUser = {
@@ -65,6 +66,7 @@ const Dashboard = () => {
       activeRoute="/dashboard"
       onNavigate={handleNavigate}
       user={dummyUser}
+      menuItems={USER_MENU_ITEMS}
     >
       <div className="dashboard-container">
         {/* Hero Section */}
