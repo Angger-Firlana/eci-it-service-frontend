@@ -3,6 +3,9 @@ import './App.css';
 import Layout from './layouts/Layout/Layout';
 import UserDashboard from './pages/user/Dashboard/Dashboard';
 import UserCreateRequest from './pages/user/CreateRequest/CreateRequest';
+import UserServiceList from './pages/user/ServiceList/ServiceList';
+import UserServiceDetail from './pages/user/ServiceList/ServiceDetail';
+import UserCalendar from './pages/user/Calendar/Calendar';
 import { USER_MENU_ITEMS } from './constants';
 
 function App() {
@@ -18,6 +21,14 @@ function App() {
     []
   );
 
+  const sidebarRoute = useMemo(() => {
+    if (activeRoute.startsWith('/service-list')) {
+      return '/service-list';
+    }
+
+    return activeRoute;
+  }, [activeRoute]);
+
   const content = useMemo(() => {
     switch (activeRoute) {
       case '/dashboard':
@@ -26,18 +37,16 @@ function App() {
         return <UserCreateRequest />;
       case '/service-list':
         return (
-          <div className="app-placeholder">
-            <h2>Service List</h2>
-            <p>Halaman ini masih dalam pengerjaan.</p>
-          </div>
+          <UserServiceList
+            onViewDetail={() => setActiveRoute('/service-list/detail')}
+          />
+        );
+      case '/service-list/detail':
+        return (
+          <UserServiceDetail onBack={() => setActiveRoute('/service-list')} />
         );
       case '/calendar':
-        return (
-          <div className="app-placeholder">
-            <h2>Kalender</h2>
-            <p>Halaman ini masih dalam pengerjaan.</p>
-          </div>
-        );
+        return <UserCalendar />;
       default:
         return <UserDashboard user={user} />;
     }
@@ -45,7 +54,7 @@ function App() {
 
   return (
     <Layout
-      activeRoute={activeRoute}
+      activeRoute={sidebarRoute}
       onNavigate={setActiveRoute}
       user={user}
       menuItems={USER_MENU_ITEMS}
