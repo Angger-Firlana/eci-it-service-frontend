@@ -1,0 +1,161 @@
+.atasan-service-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  font-family: 'Poppins', sans-serif;
+}
+
+.atasan-service-header h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.atasan-service-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.atasan-search-box {
+  position: relative;
+  width: 220px;
+}
+
+.atasan-search-box input {
+  width: 100%;
+  height: 30px;
+  border: 1px solid #D9D9D9;
+  border-radius: 10px;
+  padding: 0 32px 0 12px;
+  font-size: 12px;
+  background: #fff;
+  outline: none;
+}
+
+.atasan-search-box i {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  color: #9D9D9D;
+}
+
+.atasan-filter-group {
+  display: flex;
+  gap: 10px;
+}
+
+.atasan-filter-btn {
+  border: 1px solid #D9D9D9;
+  border-radius: 10px;
+  background: #fff;
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #6b6b6b;
+  cursor: pointer;
+}
+
+.atasan-filter-btn i {
+  font-size: 13px;
+}
+
+.atasan-service-table {
+  background: #fff;
+  border: 1px solid #D9D9D9;
+  border-radius: 11px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.atasan-service-row {
+  display: grid;
+  grid-template-columns: 0.8fr 1fr 1fr 0.9fr 1fr 1fr 1fr 0.8fr 0.9fr;
+  gap: 12px;
+  padding: 10px 14px;
+  align-items: center;
+  font-size: 12px;
+  color: #4b4b4b;
+}
+
+.atasan-service-head {
+  background: #F4F6FB;
+  color: #6b6b6b;
+  font-weight: 500;
+}
+
+.atasan-service-row + .atasan-service-row {
+  border-top: 1px solid #EFEFEF;
+}
+
+.atasan-date-input {
+  width: 100%;
+  max-width: 120px;
+  height: 26px;
+  border: 1px solid #D9D9D9;
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 11px;
+  color: #6b6b6b;
+  background: #fff;
+}
+
+.atasan-cost {
+  color: #6b6b6b;
+}
+
+.atasan-status {
+  color: #6b6b6b;
+}
+
+.atasan-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.atasan-ellipsis {
+  background: transparent;
+  border: 0;
+  font-size: 16px;
+  color: #6b6b6b;
+  cursor: pointer;
+}
+
+.atasan-detail-btn {
+  border: 1px solid #D9D9D9;
+  border-radius: 8px;
+  padding: 4px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.atasan-detail-btn img {
+  width: 12px;
+  height: 12px;
+}
+
+@media (max-width: 900px) {
+  .atasan-service-controls {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .atasan-service-table {
+    overflow-x: auto;
+  }
+
+  .atasan-service-row {
+    min-width: 860px;
+  }
+}

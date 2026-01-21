@@ -6,19 +6,27 @@ import UserCreateRequest from './pages/user/CreateRequest/CreateRequest';
 import UserServiceList from './pages/user/ServiceList/ServiceList';
 import UserServiceDetail from './pages/user/ServiceList/ServiceDetail';
 import UserCalendar from './pages/user/Calendar/Calendar';
-import { USER_MENU_ITEMS } from './constants';
+import AtasanDashboard from './pages/atasan/Dashboard/Dashboard';
+import AtasanServiceList from './pages/atasan/ServiceList/ServiceList';
+import AtasanServiceDetail from './pages/atasan/ServiceList/ServiceDetail';
+import AtasanCalendar from './pages/atasan/Calendar/Calendar';
+import AtasanInbox from './pages/atasan/Inbox/Inbox';
+import { ATASAN_MENU_ITEMS, USER_MENU_ITEMS } from './constants';
+import Login from './pages/auth/Login';
 
 function App() {
   const [activeRoute, setActiveRoute] = useState('/create-request');
+  const [role, setRole] = useState(null);
+  const [detailVariant, setDetailVariant] = useState('progress');
 
   const user = useMemo(
     () => ({
       name: 'Toni Apalah',
       email: 'Toni@gmail.com',
-      role: 'User',
-      department: 'ECOMERS',
+      role: role ? role.charAt(0).toUpperCase() + role.slice(1) : 'User',
+      department: role === 'atasan' ? 'IT' : 'ECOMERS',
     }),
-    []
+    [role]
   );
 
   const sidebarRoute = useMemo(() => {
@@ -29,7 +37,43 @@ function App() {
     return activeRoute;
   }, [activeRoute]);
 
+  const menuItems = useMemo(() => {
+    if (role === 'atasan') {
+      return ATASAN_MENU_ITEMS;
+    }
+    return USER_MENU_ITEMS;
+  }, [role]);
+
   const content = useMemo(() => {
+    if (role === 'atasan') {
+      switch (activeRoute) {
+        case '/dashboard':
+          return <AtasanDashboard user={user} />;
+        case '/service-list':
+          return (
+            <AtasanServiceList
+              onViewDetail={(row) => {
+                setDetailVariant(row?.detailVariant || 'progress');
+                setActiveRoute('/service-list/detail');
+              }}
+            />
+          );
+        case '/service-list/detail':
+          return (
+            <AtasanServiceDetail
+              variant={detailVariant}
+              onBack={() => setActiveRoute('/service-list')}
+            />
+          );
+        case '/calendar':
+          return <AtasanCalendar />;
+        case '/inbox':
+          return <AtasanInbox />;
+        default:
+          return <AtasanDashboard user={user} />;
+      }
+    }
+
     switch (activeRoute) {
       case '/dashboard':
         return <UserDashboard user={user} />;
@@ -50,14 +94,31 @@ function App() {
       default:
         return <UserDashboard user={user} />;
     }
-  }, [activeRoute, user]);
+  }, [activeRoute, detailVariant, role, user]);
+
+  if (!role) {
+    return (
+      <Login
+        onLogin={(selectedRole) => {
+          setRole(selectedRole);
+          setActiveRoute('/dashboard');
+        }}
+      />
+    );
+  }
 
   return (
     <Layout
       activeRoute={sidebarRoute}
       onNavigate={setActiveRoute}
       user={user}
-      menuItems={USER_MENU_ITEMS}
+      menuItems={menuItems}
+      onLogout={() => {
+        setRole(null);
+        setActiveRoute('/create-request');
+        setDetailVariant('progress');
+      }}
+      className={role === 'atasan' ? 'theme-atasan' : ''}
     >
       {content}
     </Layout>

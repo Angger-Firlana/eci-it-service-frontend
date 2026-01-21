@@ -3,11 +3,20 @@ import './Layout.css';
 import Sidebar from '../Sidebar';
 import Topbar from '../Topbar';
 
-const Layout = ({ children, activeRoute, onNavigate, user, menuItems }) => {
+const Layout = ({
+  children,
+  activeRoute,
+  onNavigate,
+  user,
+  menuItems,
+  onLogout,
+  className = '',
+}) => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const appClassName = ['app', className].filter(Boolean).join(' ');
 
   return (
-    <div className="app">
+    <div className={appClassName}>
       <Sidebar
         activeRoute={activeRoute}
         onNavigate={onNavigate}
@@ -17,7 +26,7 @@ const Layout = ({ children, activeRoute, onNavigate, user, menuItems }) => {
       />
 
       <main className="main">
-        <Topbar user={user} />
+        <Topbar user={user} onLogout={onLogout} />
         <div className="content">{children}</div>
       </main>
     </div>

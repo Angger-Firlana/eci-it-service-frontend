@@ -1,0 +1,336 @@
+.atasan-detail-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  font-family: 'Poppins', sans-serif;
+}
+
+.atasan-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.atasan-detail-back {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.atasan-detail-back img {
+  width: 16px;
+  height: 16px;
+}
+
+.atasan-detail-title h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.atasan-detail-title p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #6b6b6b;
+}
+
+.atasan-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 18px;
+  align-items: start;
+}
+
+.atasan-detail-left {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.atasan-detail-right {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.atasan-detail-card,
+.atasan-estimate-card,
+.atasan-action-card,
+.atasan-timeline-card {
+  background: #fff;
+  border: 1px solid #D9D9D9;
+  border-radius: 11px;
+  box-shadow: var(--shadow);
+}
+
+.atasan-detail-card {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.atasan-detail-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.atasan-detail-card-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.atasan-detail-dept {
+  font-size: 12px;
+  color: #9D9D9D;
+}
+
+.atasan-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #E0E0E0;
+  font-size: 12px;
+}
+
+.atasan-detail-key {
+  color: #9D9D9D;
+}
+
+.atasan-detail-value {
+  color: #2b2b2b;
+}
+
+.atasan-detail-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.atasan-detail-text {
+  border: 1px solid #D9D9D9;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 12px;
+  min-height: 110px;
+  background: #fff;
+}
+
+.atasan-detail-location {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.atasan-detail-address {
+  font-size: 11px;
+  color: #6b6b6b;
+  line-height: 1.45;
+}
+
+.atasan-estimate-card {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.atasan-estimate-card h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.atasan-estimate-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #E0E0E0;
+  font-size: 12px;
+  color: #6b6b6b;
+}
+
+.atasan-estimate-row span:last-child {
+  color: #2b2b2b;
+}
+
+.atasan-estimate-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.atasan-action-card {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.atasan-action-card h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.atasan-action-label {
+  font-size: 12px;
+  color: #6b6b6b;
+}
+
+.atasan-action-textarea {
+  resize: none;
+  border: 1px solid #D9D9D9;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: 'Poppins', sans-serif;
+  min-height: 80px;
+  width: 100%;
+  background: #fff;
+}
+
+.atasan-action-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.atasan-action-reject,
+.atasan-action-approve {
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: #fff;
+  cursor: pointer;
+}
+
+.atasan-action-reject {
+  background: #EF4444;
+}
+
+.atasan-action-approve {
+  background: #2966FF;
+}
+
+.atasan-timeline-card {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 260px;
+}
+
+.atasan-timeline-card h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.atasan-timeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.atasan-timeline-item {
+  display: flex;
+  gap: 12px;
+}
+
+.atasan-timeline-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.atasan-timeline-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #C9C9C9;
+}
+
+.atasan-timeline-line {
+  width: 2px;
+  flex: 1;
+  background: #C9C9C9;
+  margin-top: 4px;
+}
+
+.atasan-timeline-dot.active,
+.atasan-timeline-line.active {
+  background: var(--blue);
+}
+
+.atasan-timeline-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.atasan-timeline-tag {
+  border: 1px solid #C9C9C9;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  color: #6b6b6b;
+  width: fit-content;
+}
+
+.atasan-timeline-tag.active {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.atasan-timeline-date {
+  font-size: 11px;
+  color: #2b2b2b;
+}
+
+.atasan-timeline-desc {
+  font-size: 11px;
+  color: #6b6b6b;
+}
+
+.atasan-timeline-meta {
+  font-size: 11px;
+  color: #2b2b2b;
+}
+
+.atasan-invoice-btn {
+  margin-top: auto;
+  align-self: flex-end;
+  border: 0;
+  background: var(--blue);
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.atasan-invoice-btn i {
+  font-size: 14px;
+}
+
+@media (max-width: 900px) {
+  .atasan-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}

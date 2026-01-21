@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import './Topbar.css';
 import Avatar from '../../components/common/Avatar/Avatar';
 
-const Topbar = ({ user }) => {
+const Topbar = ({ user, onLogout }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
@@ -29,6 +29,7 @@ const Topbar = ({ user }) => {
   const handleLogout = () => {
     console.log('Logout');
     setIsUserMenuOpen(false);
+    onLogout?.();
   };
 
   return (

@@ -95,6 +95,15 @@
   transform: translateY(-1px);
 }
 
+.theme-atasan .nav-item.active {
+  background: #6fbf4d;
+  color: #F4FAFF;
+}
+
+.theme-atasan .nav-item:not(.active):hover {
+  background: #EFF7E9;
+}
+
 /* Tablet: compact (icons only) */
 @media (max-width: 900px) {
   .sidebar.sidebar-compact {
