@@ -59,6 +59,7 @@
 }
 
 .nav-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -70,6 +71,19 @@
   font-weight: 400;
   transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
   white-space: nowrap;
+  font-family: 'Poppins', sans-serif;
+}
+
+.nav-item-badge {
+  padding-right: 36px;
+}
+
+.nav-section {
+  padding: 0 18px;
+  margin-top: 6px;
+  margin-bottom: 4px;
+  font-size: 14px;
+  color: #9D9D9D;
   font-family: 'Poppins', sans-serif;
 }
 
@@ -88,6 +102,23 @@
 .nav-item.active {
   background: #2966FF;
   color: #F4FAFF;
+}
+
+.nav-badge {
+  position: absolute;
+  right: 12px;
+  top: 8px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #FF2D2D;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .nav-item:not(.active):hover {
@@ -121,6 +152,11 @@
   .sidebar.sidebar-compact .nav-item {
     justify-content: center;
     padding: 12px 10px;
+  }
+
+  .sidebar.sidebar-compact .nav-badge {
+    right: 8px;
+    top: 6px;
   }
 
   .sidebar.sidebar-compact .nav-label {

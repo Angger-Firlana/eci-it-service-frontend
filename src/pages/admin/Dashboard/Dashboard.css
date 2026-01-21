@@ -1,0 +1,7 @@
+.admin-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-bottom: 24px;
+  font-family: 'Poppins', sans-serif;
+}

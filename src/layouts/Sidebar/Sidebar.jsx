@@ -50,7 +50,20 @@ const Sidebar = ({
       {/* Navigation Menu */}
       <nav className="nav">
         {menuItems.map((item) => {
+          if (item.type === 'section') {
+            if (!showLabel) {
+              return null;
+            }
+
+            return (
+              <div className="nav-section" key={item.id || item.label}>
+                {item.label}
+              </div>
+            );
+          }
+
           const isActive = activeRoute === item.route;
+          const hasBadge = item.badge !== undefined && item.badge !== null;
 
           return (
             <a
@@ -58,7 +71,7 @@ const Sidebar = ({
               href="#"
               className={`nav-item ${isActive ? 'active' : ''} ${
                 isTablet || (isMobile && isCollapsed) ? 'nav-item-centered' : ''
-              }`}
+              } ${hasBadge ? 'nav-item-badge' : ''}`}
               onClick={(e) => {
                 e.preventDefault();
                 onNavigate(item.route);
@@ -70,6 +83,7 @@ const Sidebar = ({
                 className="nav-icon"
               />
               {showLabel && <span className="nav-label">{item.label}</span>}
+              {hasBadge && <span className="nav-badge">{item.badge}</span>}
             </a>
           );
         })}

@@ -1,0 +1,532 @@
+.admin-inbox-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  font-family: 'Poppins', sans-serif;
+}
+
+.admin-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-detail-back {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.admin-detail-back img {
+  width: 16px;
+  height: 16px;
+}
+
+.admin-detail-title h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.admin-detail-title p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #6b6b6b;
+}
+
+.admin-cancel-btn {
+  margin-left: auto;
+  border: 1px solid #D9D9D9;
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #4b4b4b;
+  cursor: pointer;
+}
+
+.admin-inbox-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 18px;
+  align-items: start;
+}
+
+.admin-inbox-left,
+.admin-inbox-right {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.admin-detail-card,
+.admin-estimate-card,
+.admin-action-card,
+.admin-approval-card,
+.admin-timeline-card {
+  background: #fff;
+  border: 1px solid #D9D9D9;
+  border-radius: 11px;
+  box-shadow: var(--shadow);
+}
+
+.admin-detail-card {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-detail-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.admin-detail-card-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.admin-detail-dept {
+  font-size: 12px;
+  color: #9D9D9D;
+}
+
+.admin-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #E0E0E0;
+  font-size: 12px;
+}
+
+.admin-detail-row .admin-detail-value {
+  margin-left: auto;
+  color: #2b2b2b;
+}
+
+.admin-detail-key {
+  color: #9D9D9D;
+}
+
+.admin-detail-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-detail-text {
+  border: 1px solid #D9D9D9;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 12px;
+  min-height: 110px;
+  background: #fff;
+}
+
+.admin-detail-location {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-detail-location-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.admin-detail-address {
+  font-size: 11px;
+  color: #6b6b6b;
+  line-height: 1.45;
+}
+
+.admin-detail-edit {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: #6b6b6b;
+  font-size: 14px;
+}
+
+.admin-estimate-card {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-estimate-card h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.admin-estimate-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #E0E0E0;
+  font-size: 12px;
+  color: #6b6b6b;
+}
+
+.admin-estimate-row span:last-child {
+  color: #2b2b2b;
+}
+
+.admin-estimate-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-action-card {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-action-card h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.admin-action-card p {
+  margin: 0;
+  font-size: 11px;
+  color: #6b6b6b;
+}
+
+.admin-action-label {
+  font-size: 12px;
+  color: #6b6b6b;
+}
+
+.admin-action-input {
+  border: 1px solid #D9D9D9;
+  border-radius: 8px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+}
+
+.admin-action-input input {
+  border: 0;
+  outline: none;
+  flex: 1;
+  font-size: 12px;
+  font-family: 'Poppins', sans-serif;
+}
+
+.admin-action-input i {
+  font-size: 14px;
+  color: #9D9D9D;
+}
+
+.admin-action-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.admin-action-reject,
+.admin-action-approve {
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: #fff;
+  cursor: pointer;
+}
+
+.admin-action-reject {
+  background: #EF4444;
+}
+
+.admin-action-approve {
+  background: #2966FF;
+}
+
+.admin-action-primary {
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #fff;
+  background: #2966FF;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  justify-content: center;
+  width: 100%;
+}
+
+.admin-approval-card {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-approval-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.admin-approval-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.admin-approval-head p {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: #6b6b6b;
+}
+
+.admin-approval-progress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  color: #6b6b6b;
+}
+
+.admin-approval-count {
+  white-space: nowrap;
+  font-size: 11px;
+  color: #6b6b6b;
+}
+
+.admin-approval-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: #E5E7EB;
+  overflow: hidden;
+}
+
+.admin-approval-bar-fill {
+  display: block;
+  height: 100%;
+  background: #22C55E;
+  border-radius: 999px;
+}
+
+.admin-approval-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-approval-item {
+  border: 1px solid #D9D9D9;
+  border-radius: 8px;
+  padding: 6px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: #6b6b6b;
+}
+
+.admin-approval-waiting {
+  border-color: #D9D9D9;
+  color: #6b6b6b;
+  background: #fff;
+}
+
+.admin-approval-approved {
+  border-color: #22C55E;
+  color: #15803D;
+  background: #F0FDF4;
+}
+
+.admin-approval-rejected {
+  border-color: #EF4444;
+  color: #EF4444;
+  background: #FEF2F2;
+}
+
+.admin-approval-name {
+  font-size: 12px;
+  color: inherit;
+}
+
+.admin-approval-role {
+  font-size: 10px;
+  color: inherit;
+}
+
+.admin-approval-note {
+  font-size: 10px;
+  color: inherit;
+  margin-top: 2px;
+}
+
+.admin-approval-status {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.admin-timeline-card {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 240px;
+}
+
+.admin-timeline-card h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.admin-timeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-timeline-item {
+  display: flex;
+  gap: 12px;
+}
+
+.admin-timeline-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.admin-timeline-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #C9C9C9;
+}
+
+.admin-timeline-line {
+  width: 2px;
+  flex: 1;
+  background: #C9C9C9;
+  margin-top: 4px;
+}
+
+.admin-timeline-dot.active,
+.admin-timeline-line.active {
+  background: #2966FF;
+}
+
+.admin-timeline-dot.pending,
+.admin-timeline-line.pending {
+  background: #2966FF;
+}
+
+.admin-timeline-dot.rejected,
+.admin-timeline-line.rejected {
+  background: #EF4444;
+}
+
+.admin-timeline-dot.revision,
+.admin-timeline-line.revision {
+  background: #F59E0B;
+}
+
+.admin-timeline-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-timeline-tag {
+  border: 1px solid #C9C9C9;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  color: #6b6b6b;
+  width: fit-content;
+}
+
+.admin-timeline-tag.active,
+.admin-timeline-tag.pending {
+  border-color: #2966FF;
+  color: #2966FF;
+}
+
+.admin-timeline-tag.rejected {
+  border-color: #EF4444;
+  color: #EF4444;
+}
+
+.admin-timeline-tag.revision {
+  border-color: #F59E0B;
+  color: #F59E0B;
+}
+
+.admin-timeline-date {
+  font-size: 11px;
+  color: #2b2b2b;
+}
+
+.admin-timeline-desc {
+  font-size: 11px;
+  color: #6b6b6b;
+}
+
+.admin-timeline-meta {
+  font-size: 11px;
+  color: #2b2b2b;
+}
+
+.admin-invoice-btn {
+  margin-top: auto;
+  align-self: flex-end;
+  border: 0;
+  background: #2966FF;
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.admin-invoice-btn i {
+  font-size: 14px;
+}
+
+@media (max-width: 900px) {
+  .admin-inbox-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-cancel-btn {
+    margin-left: 0;
+  }
+}

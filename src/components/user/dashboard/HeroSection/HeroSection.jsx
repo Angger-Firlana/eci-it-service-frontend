@@ -1,8 +1,8 @@
 import React from 'react';
 import './HeroSection.css';
-import maskotImg from '../../../../assets/images/maskot-eci-rmeove 1.png';
+import defaultMascot from '../../../../assets/images/maskot-eci-rmeove 1.png';
 
-const HeroSection = ({ user }) => {
+const HeroSection = ({ user, mascot = defaultMascot }) => {
   return (
     <section className="hero">
       <h1 className="hero-title">Welcome back, {user?.name || 'User'}</h1>
@@ -15,7 +15,7 @@ const HeroSection = ({ user }) => {
 
       {/* Mascot/Robot Image */}
       <div className="hero-mascot">
-        <img src={maskotImg} alt="Mascot" className="mascot-img" />
+        <img src={mascot} alt="Mascot" className="mascot-img" />
       </div>
     </section>
   );
