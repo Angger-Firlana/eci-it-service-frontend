@@ -1,0 +1,60 @@
+const normalizeBaseUrl = (baseUrl) => baseUrl.replace(/\/+$/, '');
+
+const resolveBaseUrl = () => {
+  const envBaseUrl = import.meta.env.VITE_API_BASE_URL;
+  if (envBaseUrl) {
+    return envBaseUrl;
+  }
+
+  if (typeof window !== 'undefined') {
+    const { origin, port } = window.location;
+    if (origin && port && port !== '5173') {
+      return `${origin}/api`;
+    }
+  }
+
+  return 'http://localhost:8000/api';
+};
+
+export const API_BASE_URL = normalizeBaseUrl(resolveBaseUrl());
+
+export const buildApiUrl = (path = '') => {
+  if (!path) return API_BASE_URL;
+  return `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+};
+
+export const unwrapApiData = (payload) => {
+  if (payload && typeof payload === 'object' && 'data' in payload) {
+    return payload.data;
+  }
+  return payload;
+};
+
+export const apiRequest = async (path, options = {}) => {
+  const { method = 'GET', body, token, headers } = options;
+  const requestHeaders = { ...(headers || {}) };
+  const requestOptions = { method, headers: requestHeaders };
+
+  if (token) {
+    requestHeaders.Authorization = `Bearer ${token}`;
+  }
+
+  if (body instanceof FormData) {
+    requestOptions.body = body;
+  } else if (body !== undefined) {
+    requestHeaders['Content-Type'] = 'application/json';
+    requestOptions.body = JSON.stringify(body);
+  }
+
+  const response = await fetch(buildApiUrl(path), requestOptions);
+  const contentType = response.headers.get('content-type') || '';
+  let data = null;
+
+  if (contentType.includes('application/json')) {
+    data = await response.json();
+  } else {
+    data = await response.text();
+  }
+
+  return { ok: response.ok, status: response.status, data };
+};

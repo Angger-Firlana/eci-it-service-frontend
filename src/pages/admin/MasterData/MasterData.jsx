@@ -1,28 +1,341 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import './MasterData.css';
 import { Modal } from '../../../components/common';
-
-const DEVICE_ROWS = [
-  { id: 1, name: 'Laptop' },
-  { id: 2, name: 'Printer' },
-];
-
-const MODEL_ROWS = [
-  { id: 1, device: 'Laptop', brand: 'Lenovo', model: 'Lenovo v14' },
-  { id: 2, device: 'Printer', brand: 'Canon', model: 'G2010' },
-];
-
-const SERVICE_ROWS = [
-  { id: 1, name: 'Perbaikan Hardware' },
-  { id: 2, name: 'Instalasi Software' },
-];
+import { apiRequest, unwrapApiData, API_BASE_URL } from '../../../lib/api';
 
 const MasterData = () => {
   const [activeTab, setActiveTab] = useState('device');
   const [modal, setModal] = useState(null);
+  const [modalMode, setModalMode] = useState('create');
+  const [modalError, setModalError] = useState('');
 
-  const openModal = () => setModal(activeTab);
-  const closeModal = () => setModal(null);
+  const [deviceTypes, setDeviceTypes] = useState([]);
+  const [deviceTypeOptions, setDeviceTypeOptions] = useState([]);
+  const [deviceModels, setDeviceModels] = useState([]);
+  const [serviceTypes, setServiceTypes] = useState([]);
+
+  const [deviceSearch, setDeviceSearch] = useState('');
+  const [modelSearch, setModelSearch] = useState('');
+  const [serviceSearch, setServiceSearch] = useState('');
+
+  const [loading, setLoading] = useState({
+    device: false,
+    model: false,
+    service: false,
+  });
+
+  const [errors, setErrors] = useState({
+    device: '',
+    model: '',
+    service: '',
+  });
+
+  const [editingItem, setEditingItem] = useState(null);
+  const [deviceForm, setDeviceForm] = useState({ name: '' });
+  const [modelForm, setModelForm] = useState({
+    device_type_id: '',
+    brand: '',
+    model: '',
+  });
+  const [serviceForm, setServiceForm] = useState({ name: '' });
+
+  const deviceTypeMap = useMemo(() => {
+    return deviceTypeOptions.reduce((acc, item) => {
+      acc[item.id] = item.name;
+      return acc;
+    }, {});
+  }, [deviceTypeOptions]);
+
+  const filteredServiceTypes = useMemo(() => {
+    const keyword = serviceSearch.trim().toLowerCase();
+    if (!keyword) return serviceTypes;
+    return serviceTypes.filter((item) =>
+      String(item.name || '').toLowerCase().includes(keyword)
+    );
+  }, [serviceSearch, serviceTypes]);
+
+  const getErrorMessage = (payload) => {
+    if (!payload) return 'Request gagal.';
+    if (typeof payload === 'string') return payload;
+    if (payload.message) return payload.message;
+    if (payload.errors) {
+      try {
+        return JSON.stringify(payload.errors);
+      } catch (error) {
+        return 'Request gagal.';
+      }
+    }
+    return 'Request gagal.';
+  };
+
+  const setTabError = (tab, message) => {
+    setErrors((prev) => ({
+      ...prev,
+      [tab]: message,
+    }));
+  };
+
+  const setTabLoading = (tab, value) => {
+    setLoading((prev) => ({
+      ...prev,
+      [tab]: value,
+    }));
+  };
+
+  const fetchDeviceTypes = async (searchValue = '') => {
+    setTabLoading('device', true);
+    setTabError('device', '');
+    try {
+      const query = searchValue ? `?search=${encodeURIComponent(searchValue)}` : '';
+      const res = await apiRequest(`/device-type${query}`);
+      if (!res.ok || res.data?.success === false) {
+        throw new Error(getErrorMessage(res.data));
+      }
+      const payload = unwrapApiData(res.data);
+      setDeviceTypes(Array.isArray(payload) ? payload : []);
+    } catch (error) {
+      setDeviceTypes([]);
+      setTabError('device', error.message || 'Gagal mengambil data.');
+    } finally {
+      setTabLoading('device', false);
+    }
+  };
+
+  const fetchDeviceTypeOptions = async () => {
+    try {
+      const res = await apiRequest('/device-type');
+      if (!res.ok || res.data?.success === false) {
+        throw new Error(getErrorMessage(res.data));
+      }
+      const payload = unwrapApiData(res.data);
+      setDeviceTypeOptions(Array.isArray(payload) ? payload : []);
+    } catch (error) {
+      setDeviceTypeOptions([]);
+    }
+  };
+
+  const fetchDeviceModels = async (searchValue = '') => {
+    setTabLoading('model', true);
+    setTabError('model', '');
+    try {
+      const query = searchValue ? `?keyword=${encodeURIComponent(searchValue)}` : '';
+      const res = await apiRequest(`/device-model${query}`);
+      if (!res.ok || res.data?.success === false) {
+        throw new Error(getErrorMessage(res.data));
+      }
+      const payload = unwrapApiData(res.data);
+      setDeviceModels(Array.isArray(payload) ? payload : []);
+    } catch (error) {
+      setDeviceModels([]);
+      setTabError('model', error.message || 'Gagal mengambil data.');
+    } finally {
+      setTabLoading('model', false);
+    }
+  };
+
+  const fetchServiceTypes = async () => {
+    setTabLoading('service', true);
+    setTabError('service', '');
+    try {
+      const res = await apiRequest('/references/service-types');
+      if (!res.ok || res.data?.success === false) {
+        throw new Error(getErrorMessage(res.data));
+      }
+      const payload = unwrapApiData(res.data);
+      setServiceTypes(Array.isArray(payload) ? payload : []);
+    } catch (error) {
+      setServiceTypes([]);
+      setTabError('service', error.message || 'Gagal mengambil data.');
+    } finally {
+      setTabLoading('service', false);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (activeTab === 'device') {
+        fetchDeviceTypes(deviceSearch.trim());
+      }
+      if (activeTab === 'model') {
+        fetchDeviceModels(modelSearch.trim());
+        fetchDeviceTypeOptions();
+      }
+      if (activeTab === 'service') {
+        fetchServiceTypes();
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [activeTab, deviceSearch, modelSearch]);
+
+  const openModal = (mode = 'create', item = null) => {
+    setModalError('');
+    setModal(activeTab);
+    setModalMode(mode);
+    setEditingItem(item);
+
+    if (activeTab === 'device') {
+      setDeviceForm({ name: item?.name || '' });
+    }
+
+    if (activeTab === 'model') {
+      setModelForm({
+        device_type_id: item?.device_type_id || '',
+        brand: item?.brand || '',
+        model: item?.model || '',
+      });
+    }
+
+    if (activeTab === 'service') {
+      setServiceForm({ name: item?.name || '' });
+    }
+  };
+
+  const closeModal = () => {
+    setModal(null);
+    setEditingItem(null);
+    setModalError('');
+  };
+
+  const handleCreateDeviceType = async () => {
+    const payload = { name: deviceForm.name.trim() };
+    if (!payload.name) {
+      setModalError('Nama perangkat wajib diisi.');
+      return;
+    }
+
+    try {
+      const res = await apiRequest('/device-type', {
+        method: 'POST',
+        body: payload,
+      });
+      if (!res.ok || res.data?.success === false) {
+        throw new Error(getErrorMessage(res.data));
+      }
+      await fetchDeviceTypes(deviceSearch.trim());
+      await fetchDeviceTypeOptions();
+      closeModal();
+    } catch (error) {
+      setModalError(error.message || 'Gagal menyimpan perangkat.');
+    }
+  };
+
+  const handleUpdateDeviceType = async () => {
+    if (!editingItem) return;
+    const payload = { name: deviceForm.name.trim() };
+    if (!payload.name) {
+      setModalError('Nama perangkat wajib diisi.');
+      return;
+    }
+    try {
+      const res = await apiRequest(`/device-type/${editingItem.id}`, {
+        method: 'PUT',
+        body: payload,
+      });
+      if (!res.ok || res.data?.success === false) {
+        throw new Error(getErrorMessage(res.data));
+      }
+      await fetchDeviceTypes(deviceSearch.trim());
+      await fetchDeviceTypeOptions();
+      closeModal();
+    } catch (error) {
+      setModalError(error.message || 'Gagal memperbarui perangkat.');
+    }
+  };
+
+  const handleDeleteDeviceType = async (item) => {
+    const confirmed = window.confirm(`Hapus perangkat "${item.name}"?`);
+    if (!confirmed) return;
+    try {
+      const res = await apiRequest(`/device-type/${item.id}`, { method: 'DELETE' });
+      if (!res.ok || res.data?.success === false) {
+        throw new Error(getErrorMessage(res.data));
+      }
+      await fetchDeviceTypes(deviceSearch.trim());
+      await fetchDeviceTypeOptions();
+    } catch (error) {
+      setTabError('device', error.message || 'Gagal menghapus perangkat.');
+    }
+  };
+
+  const handleCreateDeviceModel = async () => {
+    const payload = {
+      device_type_id: Number(modelForm.device_type_id),
+      brand: modelForm.brand.trim(),
+      model: modelForm.model.trim(),
+    };
+
+    if (!payload.device_type_id || !payload.brand || !payload.model) {
+      setModalError('Perangkat, brand, dan model wajib diisi.');
+      return;
+    }
+
+    try {
+      const res = await apiRequest('/device-model', {
+        method: 'POST',
+        body: payload,
+      });
+      if (!res.ok || res.data?.success === false) {
+        throw new Error(getErrorMessage(res.data));
+      }
+      await fetchDeviceModels(modelSearch.trim());
+      closeModal();
+    } catch (error) {
+      setModalError(error.message || 'Gagal menyimpan model.');
+    }
+  };
+
+  const handleUpdateDeviceModel = async () => {
+    if (!editingItem) return;
+    const payload = {
+      device_type_id: Number(modelForm.device_type_id),
+      brand: modelForm.brand.trim(),
+      model: modelForm.model.trim(),
+    };
+
+    if (!payload.device_type_id || !payload.brand || !payload.model) {
+      setModalError('Perangkat, brand, dan model wajib diisi.');
+      return;
+    }
+
+    try {
+      const res = await apiRequest(`/device-model/${editingItem.id}`, {
+        method: 'PUT',
+        body: payload,
+      });
+      if (!res.ok || res.data?.success === false) {
+        throw new Error(getErrorMessage(res.data));
+      }
+      await fetchDeviceModels(modelSearch.trim());
+      closeModal();
+    } catch (error) {
+      setModalError(error.message || 'Gagal memperbarui model.');
+    }
+  };
+
+  const handleDeleteDeviceModel = async (item) => {
+    const confirmed = window.confirm(`Hapus model "${item.brand} ${item.model}"?`);
+    if (!confirmed) return;
+    try {
+      const res = await apiRequest(`/device-model/${item.id}`, { method: 'DELETE' });
+      if (!res.ok || res.data?.success === false) {
+        throw new Error(getErrorMessage(res.data));
+      }
+      await fetchDeviceModels(modelSearch.trim());
+    } catch (error) {
+      setTabError('model', error.message || 'Gagal menghapus model.');
+    }
+  };
+
+  const handleServiceReadOnly = () => {
+    setModalError('Endpoint untuk tambah/edit service type belum tersedia di API.');
+  };
+
+  const renderStatusRow = (message) => (
+    <div className="admin-master-row">
+      <div className="admin-master-empty">{message}</div>
+    </div>
+  );
 
   return (
     <div className="admin-master-page">
@@ -66,6 +379,9 @@ const MasterData = () => {
               {activeTab === 'model' && 'Daftar Model'}
               {activeTab === 'service' && 'Daftar Jenis Service'}
             </div>
+            <div className="admin-master-subtitle">
+              API: {API_BASE_URL}
+            </div>
           </div>
 
           <div className="admin-master-actions">
@@ -86,19 +402,45 @@ const MasterData = () => {
 
             {(activeTab === 'model' || activeTab === 'service') && (
               <div className="admin-search-box">
-                <input type="text" placeholder="" aria-label="Search" />
+                <input
+                  type="text"
+                  placeholder="Cari"
+                  aria-label="Search"
+                  value={activeTab === 'model' ? modelSearch : serviceSearch}
+                  onChange={(event) =>
+                    activeTab === 'model'
+                      ? setModelSearch(event.target.value)
+                      : setServiceSearch(event.target.value)
+                  }
+                />
                 <i className="bi bi-search"></i>
               </div>
             )}
 
             {activeTab === 'device' && (
               <div className="admin-search-box">
-                <input type="text" placeholder="" aria-label="Search" />
+                <input
+                  type="text"
+                  placeholder="Cari"
+                  aria-label="Search"
+                  value={deviceSearch}
+                  onChange={(event) => setDeviceSearch(event.target.value)}
+                />
                 <i className="bi bi-search"></i>
               </div>
             )}
 
-            <button className="admin-master-add" type="button" onClick={openModal}>
+            <button
+              className="admin-master-add"
+              type="button"
+              onClick={() => openModal('create')}
+              disabled={activeTab === 'service'}
+              title={
+                activeTab === 'service'
+                  ? 'Service type belum punya endpoint tambah/edit'
+                  : 'Tambah data'
+              }
+            >
               <span>+ Tambah</span>
             </button>
           </div>
@@ -111,19 +453,31 @@ const MasterData = () => {
                 <div>Nama</div>
                 <div className="admin-master-action-col">Aksi</div>
               </div>
-              {DEVICE_ROWS.map((row) => (
-                <div className="admin-master-row" key={row.id}>
-                  <div>{row.name}</div>
-                  <div className="admin-master-actions-cell">
-                    <button type="button" className="admin-master-icon">
-                      <i className="bi bi-pencil"></i>
-                    </button>
-                    <button type="button" className="admin-master-icon">
-                      <i className="bi bi-trash"></i>
-                    </button>
-                  </div>
-                </div>
-              ))}
+              {loading.device && renderStatusRow('Memuat data...')}
+              {!loading.device && errors.device && renderStatusRow(errors.device)}
+              {!loading.device && !errors.device && deviceTypes.length === 0
+                ? renderStatusRow('Data kosong.')
+                : deviceTypes.map((row) => (
+                    <div className="admin-master-row" key={row.id}>
+                      <div>{row.name}</div>
+                      <div className="admin-master-actions-cell">
+                        <button
+                          type="button"
+                          className="admin-master-icon"
+                          onClick={() => openModal('edit', row)}
+                        >
+                          <i className="bi bi-pencil"></i>
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-master-icon"
+                          onClick={() => handleDeleteDeviceType(row)}
+                        >
+                          <i className="bi bi-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
             </>
           )}
 
@@ -135,21 +489,33 @@ const MasterData = () => {
                 <div>Model</div>
                 <div className="admin-master-action-col">Aksi</div>
               </div>
-              {MODEL_ROWS.map((row) => (
-                <div className="admin-master-row admin-master-model-row" key={row.id}>
-                  <div>{row.device}</div>
-                  <div>{row.brand}</div>
-                  <div>{row.model}</div>
-                  <div className="admin-master-actions-cell">
-                    <button type="button" className="admin-master-icon">
-                      <i className="bi bi-pencil"></i>
-                    </button>
-                    <button type="button" className="admin-master-icon">
-                      <i className="bi bi-trash"></i>
-                    </button>
-                  </div>
-                </div>
-              ))}
+              {loading.model && renderStatusRow('Memuat data...')}
+              {!loading.model && errors.model && renderStatusRow(errors.model)}
+              {!loading.model && !errors.model && deviceModels.length === 0
+                ? renderStatusRow('Data kosong.')
+                : deviceModels.map((row) => (
+                    <div className="admin-master-row admin-master-model-row" key={row.id}>
+                      <div>{deviceTypeMap[row.device_type_id] || '-'}</div>
+                      <div>{row.brand}</div>
+                      <div>{row.model}</div>
+                      <div className="admin-master-actions-cell">
+                        <button
+                          type="button"
+                          className="admin-master-icon"
+                          onClick={() => openModal('edit', row)}
+                        >
+                          <i className="bi bi-pencil"></i>
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-master-icon"
+                          onClick={() => handleDeleteDeviceModel(row)}
+                        >
+                          <i className="bi bi-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
             </>
           )}
 
@@ -159,19 +525,31 @@ const MasterData = () => {
                 <div>Jenis Service</div>
                 <div className="admin-master-action-col">Aksi</div>
               </div>
-              {SERVICE_ROWS.map((row) => (
-                <div className="admin-master-row" key={row.id}>
-                  <div>{row.name}</div>
-                  <div className="admin-master-actions-cell">
-                    <button type="button" className="admin-master-icon">
-                      <i className="bi bi-pencil"></i>
-                    </button>
-                    <button type="button" className="admin-master-icon">
-                      <i className="bi bi-trash"></i>
-                    </button>
-                  </div>
-                </div>
-              ))}
+              {loading.service && renderStatusRow('Memuat data...')}
+              {!loading.service && errors.service && renderStatusRow(errors.service)}
+              {!loading.service && !errors.service && filteredServiceTypes.length === 0
+                ? renderStatusRow('Data kosong.')
+                : filteredServiceTypes.map((row) => (
+                    <div className="admin-master-row" key={row.id}>
+                      <div>{row.name}</div>
+                      <div className="admin-master-actions-cell">
+                        <button
+                          type="button"
+                          className="admin-master-icon is-disabled"
+                          disabled
+                        >
+                          <i className="bi bi-pencil"></i>
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-master-icon is-disabled"
+                          disabled
+                        >
+                          <i className="bi bi-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
             </>
           )}
         </div>
@@ -181,14 +559,24 @@ const MasterData = () => {
         <button className="admin-modal-close" type="button" onClick={closeModal}>
           <i className="bi bi-x"></i>
         </button>
-        <h2>Tambah Perangkat</h2>
+        <h2>{modalMode === 'edit' ? 'Edit Perangkat' : 'Tambah Perangkat'}</h2>
         <p>Tambahkan perangkat ...</p>
+        {modalError && <div className="admin-modal-error">{modalError}</div>}
         <div className="admin-modal-field">
           <label>Nama</label>
-          <input type="text" placeholder="Masukkan nama perangkat" />
+          <input
+            type="text"
+            placeholder="Masukkan nama perangkat"
+            value={deviceForm.name}
+            onChange={(event) => setDeviceForm({ name: event.target.value })}
+          />
         </div>
         <div className="admin-modal-actions">
-          <button className="admin-modal-save" type="button">
+          <button
+            className="admin-modal-save"
+            type="button"
+            onClick={modalMode === 'edit' ? handleUpdateDeviceType : handleCreateDeviceType}
+          >
             Simpan
           </button>
         </div>
@@ -198,26 +586,62 @@ const MasterData = () => {
         <button className="admin-modal-close" type="button" onClick={closeModal}>
           <i className="bi bi-x"></i>
         </button>
-        <h2>Tambah Model</h2>
+        <h2>{modalMode === 'edit' ? 'Edit Model' : 'Tambah Model'}</h2>
         <p>Tambahkan model ...</p>
+        {modalError && <div className="admin-modal-error">{modalError}</div>}
         <div className="admin-modal-field">
           <label>Perangkat</label>
-          <select>
+          <select
+            value={modelForm.device_type_id}
+            onChange={(event) =>
+              setModelForm((prev) => ({
+                ...prev,
+                device_type_id: event.target.value,
+              }))
+            }
+          >
             <option value="">Pilih</option>
-            <option value="Laptop">Laptop</option>
-            <option value="Printer">Printer</option>
+            {deviceTypeOptions.map((deviceType) => (
+              <option key={deviceType.id} value={deviceType.id}>
+                {deviceType.name}
+              </option>
+            ))}
           </select>
         </div>
         <div className="admin-modal-field">
           <label>Brand/ merk</label>
-          <input type="text" placeholder="Masukkan nama Merk" />
+          <input
+            type="text"
+            placeholder="Masukkan nama Merk"
+            value={modelForm.brand}
+            onChange={(event) =>
+              setModelForm((prev) => ({
+                ...prev,
+                brand: event.target.value,
+              }))
+            }
+          />
         </div>
         <div className="admin-modal-field">
           <label>Nama Model</label>
-          <input type="text" placeholder="Masukkan nama model" />
+          <input
+            type="text"
+            placeholder="Masukkan nama model"
+            value={modelForm.model}
+            onChange={(event) =>
+              setModelForm((prev) => ({
+                ...prev,
+                model: event.target.value,
+              }))
+            }
+          />
         </div>
         <div className="admin-modal-actions">
-          <button className="admin-modal-save" type="button">
+          <button
+            className="admin-modal-save"
+            type="button"
+            onClick={modalMode === 'edit' ? handleUpdateDeviceModel : handleCreateDeviceModel}
+          >
             Simpan
           </button>
         </div>
@@ -229,12 +653,18 @@ const MasterData = () => {
         </button>
         <h2>Tambah Jenis Service</h2>
         <p>Tambahkan jenis ...</p>
+        {modalError && <div className="admin-modal-error">{modalError}</div>}
         <div className="admin-modal-field">
           <label>Jenis</label>
-          <input type="text" placeholder="Masukkan nama jenis servicenya" />
+          <input
+            type="text"
+            placeholder="Masukkan nama jenis servicenya"
+            value={serviceForm.name}
+            onChange={(event) => setServiceForm({ name: event.target.value })}
+          />
         </div>
         <div className="admin-modal-actions">
-          <button className="admin-modal-save" type="button">
+          <button className="admin-modal-save" type="button" onClick={handleServiceReadOnly}>
             Simpan
           </button>
         </div>

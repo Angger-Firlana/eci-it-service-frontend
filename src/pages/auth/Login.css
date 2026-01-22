@@ -91,6 +91,48 @@
   cursor: pointer;
 }
 
+.login-test {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.login-test-btn {
+  background: #f6f6f6;
+  border: 1px dashed #9da3af;
+  color: #2b2b2b;
+}
+
+.login-test-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.login-test-meta {
+  font-size: 11px;
+  color: #6b6b6b;
+}
+
+.login-test-log {
+  border: 1px solid #ececec;
+  background: #fafafa;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 11px;
+  color: #333;
+  max-height: 220px;
+  overflow: auto;
+  line-height: 1.4;
+}
+
+.login-test-log pre {
+  margin: 0;
+  font-family: 'Courier New', Courier, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .login-robot {
   width: 110px;
   height: auto;

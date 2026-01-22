@@ -59,6 +59,12 @@
   color: #2b2b2b;
 }
 
+.admin-master-subtitle {
+  font-size: 11px;
+  color: #6b6b6b;
+  margin-top: 4px;
+}
+
 .admin-master-actions {
   display: flex;
   align-items: center;
@@ -74,6 +80,11 @@
   color: #fff;
   font-size: 12px;
   cursor: pointer;
+}
+
+.admin-master-add:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .admin-search-box {
@@ -134,6 +145,11 @@
   align-items: center;
 }
 
+.admin-master-empty {
+  grid-column: 1 / -1;
+  color: #6b6b6b;
+}
+
 .admin-master-model-row,
 .admin-master-model-head {
   grid-template-columns: 1fr 1fr 1fr 120px;
@@ -165,6 +181,20 @@
   cursor: pointer;
   color: #4b4b4b;
   font-size: 14px;
+}
+
+.admin-master-icon.is-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.admin-modal-error {
+  background: #fff0f0;
+  border: 1px solid #ffc2c2;
+  color: #a23434;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
 }
 
 @media (max-width: 900px) {
