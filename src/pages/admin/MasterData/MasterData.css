@@ -65,6 +65,16 @@
   margin-top: 4px;
 }
 
+.admin-master-error {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #a23434;
+  background: #fff0f0;
+  border: 1px solid #ffc2c2;
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
 .admin-master-actions {
   display: flex;
   align-items: center;

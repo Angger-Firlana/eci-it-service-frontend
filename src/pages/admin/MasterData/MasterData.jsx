@@ -3,6 +3,41 @@ import './MasterData.css';
 import { Modal } from '../../../components/common';
 import { apiRequest, unwrapApiData, API_BASE_URL } from '../../../lib/api';
 
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_KEYS = {
+  deviceTypes: 'eci-masterdata-device-types',
+  deviceModels: 'eci-masterdata-device-models',
+  serviceTypes: 'eci-masterdata-service-types',
+};
+
+const readCache = (key) => {
+  if (typeof window === 'undefined') return null;
+  const raw = window.localStorage.getItem(key);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.data) || !parsed.ts) return null;
+    if (Date.now() - parsed.ts > CACHE_TTL_MS) return null;
+    return parsed.data;
+  } catch (error) {
+    return null;
+  }
+};
+
+const writeCache = (key, data) => {
+  if (typeof window === 'undefined') return;
+  const safeData = Array.isArray(data)
+    ? data.filter((item) => !item?.__optimistic)
+    : [];
+  window.localStorage.setItem(
+    key,
+    JSON.stringify({
+      ts: Date.now(),
+      data: safeData,
+    })
+  );
+};
+
 const MasterData = () => {
   const [activeTab, setActiveTab] = useState('device');
   const [modal, setModal] = useState(null);
@@ -10,7 +45,6 @@ const MasterData = () => {
   const [modalError, setModalError] = useState('');
 
   const [deviceTypes, setDeviceTypes] = useState([]);
-  const [deviceTypeOptions, setDeviceTypeOptions] = useState([]);
   const [deviceModels, setDeviceModels] = useState([]);
   const [serviceTypes, setServiceTypes] = useState([]);
 
@@ -40,11 +74,29 @@ const MasterData = () => {
   const [serviceForm, setServiceForm] = useState({ name: '' });
 
   const deviceTypeMap = useMemo(() => {
-    return deviceTypeOptions.reduce((acc, item) => {
+    return deviceTypes.reduce((acc, item) => {
       acc[item.id] = item.name;
       return acc;
     }, {});
-  }, [deviceTypeOptions]);
+  }, [deviceTypes]);
+
+  const filteredDeviceTypes = useMemo(() => {
+    const keyword = deviceSearch.trim().toLowerCase();
+    if (!keyword) return deviceTypes;
+    return deviceTypes.filter((item) =>
+      String(item.name || '').toLowerCase().includes(keyword)
+    );
+  }, [deviceSearch, deviceTypes]);
+
+  const filteredDeviceModels = useMemo(() => {
+    const keyword = modelSearch.trim().toLowerCase();
+    if (!keyword) return deviceModels;
+    return deviceModels.filter((item) => {
+      const brand = String(item.brand || '').toLowerCase();
+      const model = String(item.model || '').toLowerCase();
+      return brand.includes(keyword) || model.includes(keyword);
+    });
+  }, [deviceModels, modelSearch]);
 
   const filteredServiceTypes = useMemo(() => {
     const keyword = serviceSearch.trim().toLowerCase();
@@ -82,51 +134,54 @@ const MasterData = () => {
     }));
   };
 
-  const fetchDeviceTypes = async (searchValue = '') => {
+  const fetchDeviceTypes = async () => {
+    const cached = readCache(CACHE_KEYS.deviceTypes);
+    if (cached?.length) {
+      setDeviceTypes(cached);
+      setTabError('device', '');
+      setTabLoading('device', false);
+      return;
+    }
+
     setTabLoading('device', true);
     setTabError('device', '');
-    try {
-      const query = searchValue ? `?search=${encodeURIComponent(searchValue)}` : '';
-      const res = await apiRequest(`/device-type${query}`);
-      if (!res.ok || res.data?.success === false) {
-        throw new Error(getErrorMessage(res.data));
-      }
-      const payload = unwrapApiData(res.data);
-      setDeviceTypes(Array.isArray(payload) ? payload : []);
-    } catch (error) {
-      setDeviceTypes([]);
-      setTabError('device', error.message || 'Gagal mengambil data.');
-    } finally {
-      setTabLoading('device', false);
-    }
-  };
-
-  const fetchDeviceTypeOptions = async () => {
     try {
       const res = await apiRequest('/device-type');
       if (!res.ok || res.data?.success === false) {
         throw new Error(getErrorMessage(res.data));
       }
       const payload = unwrapApiData(res.data);
-      setDeviceTypeOptions(Array.isArray(payload) ? payload : []);
+      const list = Array.isArray(payload) ? payload : [];
+      setDeviceTypes(list);
+      writeCache(CACHE_KEYS.deviceTypes, list);
     } catch (error) {
-      setDeviceTypeOptions([]);
+      setTabError('device', error.message || 'Gagal mengambil data.');
+    } finally {
+      setTabLoading('device', false);
     }
   };
 
-  const fetchDeviceModels = async (searchValue = '') => {
+  const fetchDeviceModels = async () => {
+    const cached = readCache(CACHE_KEYS.deviceModels);
+    if (cached?.length) {
+      setDeviceModels(cached);
+      setTabError('model', '');
+      setTabLoading('model', false);
+      return;
+    }
+
     setTabLoading('model', true);
     setTabError('model', '');
     try {
-      const query = searchValue ? `?keyword=${encodeURIComponent(searchValue)}` : '';
-      const res = await apiRequest(`/device-model${query}`);
+      const res = await apiRequest('/device-model');
       if (!res.ok || res.data?.success === false) {
         throw new Error(getErrorMessage(res.data));
       }
       const payload = unwrapApiData(res.data);
-      setDeviceModels(Array.isArray(payload) ? payload : []);
+      const list = Array.isArray(payload) ? payload : [];
+      setDeviceModels(list);
+      writeCache(CACHE_KEYS.deviceModels, list);
     } catch (error) {
-      setDeviceModels([]);
       setTabError('model', error.message || 'Gagal mengambil data.');
     } finally {
       setTabLoading('model', false);
@@ -134,6 +189,14 @@ const MasterData = () => {
   };
 
   const fetchServiceTypes = async () => {
+    const cached = readCache(CACHE_KEYS.serviceTypes);
+    if (cached?.length) {
+      setServiceTypes(cached);
+      setTabError('service', '');
+      setTabLoading('service', false);
+      return;
+    }
+
     setTabLoading('service', true);
     setTabError('service', '');
     try {
@@ -142,9 +205,10 @@ const MasterData = () => {
         throw new Error(getErrorMessage(res.data));
       }
       const payload = unwrapApiData(res.data);
-      setServiceTypes(Array.isArray(payload) ? payload : []);
+      const list = Array.isArray(payload) ? payload : [];
+      setServiceTypes(list);
+      writeCache(CACHE_KEYS.serviceTypes, list);
     } catch (error) {
-      setServiceTypes([]);
       setTabError('service', error.message || 'Gagal mengambil data.');
     } finally {
       setTabLoading('service', false);
@@ -152,21 +216,25 @@ const MasterData = () => {
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (activeTab === 'device') {
-        fetchDeviceTypes(deviceSearch.trim());
+    if (activeTab === 'device') {
+      if (deviceTypes.length === 0) {
+        fetchDeviceTypes();
       }
-      if (activeTab === 'model') {
-        fetchDeviceModels(modelSearch.trim());
-        fetchDeviceTypeOptions();
+    }
+    if (activeTab === 'model') {
+      if (deviceModels.length === 0) {
+        fetchDeviceModels();
       }
-      if (activeTab === 'service') {
+      if (deviceTypes.length === 0) {
+        fetchDeviceTypes();
+      }
+    }
+    if (activeTab === 'service') {
+      if (serviceTypes.length === 0) {
         fetchServiceTypes();
       }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [activeTab, deviceSearch, modelSearch]);
+    }
+  }, [activeTab, deviceModels.length, deviceTypes.length, serviceTypes.length]);
 
   const openModal = (mode = 'create', item = null) => {
     setModalError('');
@@ -204,7 +272,12 @@ const MasterData = () => {
       return;
     }
 
+    const tempId = `temp-${Date.now()}`;
     try {
+      const optimisticItem = { id: tempId, name: payload.name, __optimistic: true };
+      setDeviceTypes((prev) => [optimisticItem, ...prev]);
+      closeModal();
+
       const res = await apiRequest('/device-type', {
         method: 'POST',
         body: payload,
@@ -212,11 +285,23 @@ const MasterData = () => {
       if (!res.ok || res.data?.success === false) {
         throw new Error(getErrorMessage(res.data));
       }
-      await fetchDeviceTypes(deviceSearch.trim());
-      await fetchDeviceTypeOptions();
-      closeModal();
+      const created = unwrapApiData(res.data);
+      if (created?.id) {
+        setDeviceTypes((prev) => {
+          const next = prev.map((item) => (item.id === tempId ? created : item));
+          writeCache(CACHE_KEYS.deviceTypes, next);
+          return next;
+        });
+      } else {
+        await fetchDeviceTypes();
+      }
     } catch (error) {
-      setModalError(error.message || 'Gagal menyimpan perangkat.');
+      setDeviceTypes((prev) => {
+        const next = prev.filter((item) => item.id !== tempId);
+        writeCache(CACHE_KEYS.deviceTypes, next);
+        return next;
+      });
+      setTabError('device', error.message || 'Gagal menyimpan perangkat.');
     }
   };
 
@@ -235,8 +320,14 @@ const MasterData = () => {
       if (!res.ok || res.data?.success === false) {
         throw new Error(getErrorMessage(res.data));
       }
-      await fetchDeviceTypes(deviceSearch.trim());
-      await fetchDeviceTypeOptions();
+      const updated = unwrapApiData(res.data) || payload;
+      setDeviceTypes((prev) => {
+        const next = prev.map((item) =>
+          item.id === editingItem.id ? { ...item, ...updated } : item
+        );
+        writeCache(CACHE_KEYS.deviceTypes, next);
+        return next;
+      });
       closeModal();
     } catch (error) {
       setModalError(error.message || 'Gagal memperbarui perangkat.');
@@ -246,14 +337,20 @@ const MasterData = () => {
   const handleDeleteDeviceType = async (item) => {
     const confirmed = window.confirm(`Hapus perangkat "${item.name}"?`);
     if (!confirmed) return;
+    const prevItems = deviceTypes;
+    setDeviceTypes((prev) => {
+      const next = prev.filter((entry) => entry.id !== item.id);
+      writeCache(CACHE_KEYS.deviceTypes, next);
+      return next;
+    });
     try {
       const res = await apiRequest(`/device-type/${item.id}`, { method: 'DELETE' });
       if (!res.ok || res.data?.success === false) {
         throw new Error(getErrorMessage(res.data));
       }
-      await fetchDeviceTypes(deviceSearch.trim());
-      await fetchDeviceTypeOptions();
     } catch (error) {
+      setDeviceTypes(prevItems);
+      writeCache(CACHE_KEYS.deviceTypes, prevItems);
       setTabError('device', error.message || 'Gagal menghapus perangkat.');
     }
   };
@@ -270,7 +367,12 @@ const MasterData = () => {
       return;
     }
 
+    const tempId = `temp-${Date.now()}`;
     try {
+      const optimisticItem = { ...payload, id: tempId, __optimistic: true };
+      setDeviceModels((prev) => [optimisticItem, ...prev]);
+      closeModal();
+
       const res = await apiRequest('/device-model', {
         method: 'POST',
         body: payload,
@@ -278,10 +380,23 @@ const MasterData = () => {
       if (!res.ok || res.data?.success === false) {
         throw new Error(getErrorMessage(res.data));
       }
-      await fetchDeviceModels(modelSearch.trim());
-      closeModal();
+      const created = unwrapApiData(res.data);
+      if (created?.id) {
+        setDeviceModels((prev) => {
+          const next = prev.map((item) => (item.id === tempId ? created : item));
+          writeCache(CACHE_KEYS.deviceModels, next);
+          return next;
+        });
+      } else {
+        await fetchDeviceModels();
+      }
     } catch (error) {
-      setModalError(error.message || 'Gagal menyimpan model.');
+      setDeviceModels((prev) => {
+        const next = prev.filter((item) => item.id !== tempId);
+        writeCache(CACHE_KEYS.deviceModels, next);
+        return next;
+      });
+      setTabError('model', error.message || 'Gagal menyimpan model.');
     }
   };
 
@@ -306,7 +421,14 @@ const MasterData = () => {
       if (!res.ok || res.data?.success === false) {
         throw new Error(getErrorMessage(res.data));
       }
-      await fetchDeviceModels(modelSearch.trim());
+      const updated = unwrapApiData(res.data) || payload;
+      setDeviceModels((prev) => {
+        const next = prev.map((item) =>
+          item.id === editingItem.id ? { ...item, ...updated } : item
+        );
+        writeCache(CACHE_KEYS.deviceModels, next);
+        return next;
+      });
       closeModal();
     } catch (error) {
       setModalError(error.message || 'Gagal memperbarui model.');
@@ -316,13 +438,20 @@ const MasterData = () => {
   const handleDeleteDeviceModel = async (item) => {
     const confirmed = window.confirm(`Hapus model "${item.brand} ${item.model}"?`);
     if (!confirmed) return;
+    const prevItems = deviceModels;
+    setDeviceModels((prev) => {
+      const next = prev.filter((entry) => entry.id !== item.id);
+      writeCache(CACHE_KEYS.deviceModels, next);
+      return next;
+    });
     try {
       const res = await apiRequest(`/device-model/${item.id}`, { method: 'DELETE' });
       if (!res.ok || res.data?.success === false) {
         throw new Error(getErrorMessage(res.data));
       }
-      await fetchDeviceModels(modelSearch.trim());
     } catch (error) {
+      setDeviceModels(prevItems);
+      writeCache(CACHE_KEYS.deviceModels, prevItems);
       setTabError('model', error.message || 'Gagal menghapus model.');
     }
   };
@@ -382,6 +511,9 @@ const MasterData = () => {
             <div className="admin-master-subtitle">
               API: {API_BASE_URL}
             </div>
+            {errors[activeTab] && (
+              <div className="admin-master-error">{errors[activeTab]}</div>
+            )}
           </div>
 
           <div className="admin-master-actions">
@@ -453,11 +585,11 @@ const MasterData = () => {
                 <div>Nama</div>
                 <div className="admin-master-action-col">Aksi</div>
               </div>
-              {loading.device && renderStatusRow('Memuat data...')}
-              {!loading.device && errors.device && renderStatusRow(errors.device)}
-              {!loading.device && !errors.device && deviceTypes.length === 0
+              {loading.device && filteredDeviceTypes.length === 0 &&
+                renderStatusRow('Memuat data...')}
+              {!loading.device && !errors.device && filteredDeviceTypes.length === 0
                 ? renderStatusRow('Data kosong.')
-                : deviceTypes.map((row) => (
+                : filteredDeviceTypes.map((row) => (
                     <div className="admin-master-row" key={row.id}>
                       <div>{row.name}</div>
                       <div className="admin-master-actions-cell">
@@ -489,11 +621,11 @@ const MasterData = () => {
                 <div>Model</div>
                 <div className="admin-master-action-col">Aksi</div>
               </div>
-              {loading.model && renderStatusRow('Memuat data...')}
-              {!loading.model && errors.model && renderStatusRow(errors.model)}
-              {!loading.model && !errors.model && deviceModels.length === 0
+              {loading.model && filteredDeviceModels.length === 0 &&
+                renderStatusRow('Memuat data...')}
+              {!loading.model && !errors.model && filteredDeviceModels.length === 0
                 ? renderStatusRow('Data kosong.')
-                : deviceModels.map((row) => (
+                : filteredDeviceModels.map((row) => (
                     <div className="admin-master-row admin-master-model-row" key={row.id}>
                       <div>{deviceTypeMap[row.device_type_id] || '-'}</div>
                       <div>{row.brand}</div>
@@ -525,8 +657,7 @@ const MasterData = () => {
                 <div>Jenis Service</div>
                 <div className="admin-master-action-col">Aksi</div>
               </div>
-              {loading.service && renderStatusRow('Memuat data...')}
-              {!loading.service && errors.service && renderStatusRow(errors.service)}
+              {loading.service && filteredServiceTypes.length === 0 && renderStatusRow('Memuat data...')}
               {!loading.service && !errors.service && filteredServiceTypes.length === 0
                 ? renderStatusRow('Data kosong.')
                 : filteredServiceTypes.map((row) => (
@@ -601,7 +732,7 @@ const MasterData = () => {
             }
           >
             <option value="">Pilih</option>
-            {deviceTypeOptions.map((deviceType) => (
+            {deviceTypes.map((deviceType) => (
               <option key={deviceType.id} value={deviceType.id}>
                 {deviceType.name}
               </option>
