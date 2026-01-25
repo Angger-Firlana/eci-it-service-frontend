@@ -1,85 +1,285 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import './CreateRequest.css';
 import backIcon from '../../../assets/icons/back.svg';
 import nextIcon from '../../../assets/icons/next.svg';
-
-const DEVICE_OPTIONS = [
-  'Laptop',
-  'PC',
-  'Monitor',
-  'Printer',
-  'Scaner',
-  'UPS',
-  'Mikrotik',
-  'Switch',
-  'Proyektor',
-  '+',
-];
-
-const BRAND_OPTIONS = ['Lenovo', 'Apple', 'Asus', 'Lainnya'];
-
-const MODEL_OPTIONS = {
-  Lenovo: ['Lenovo V14', 'Lenovo V13', 'Thinkpad'],
-  Apple: ['MacBook Air', 'MacBook Pro'],
-  Asus: ['VivoBook', 'ROG', 'TUF'],
-  Lainnya: ['Lainnya'],
-};
-
-const SERVICE_OPTIONS = ['Hardware', 'Software', 'Network', 'Other'];
+import { apiRequest, parseApiError } from '../../../lib/api';
+import { useAuth } from '../../../contexts/AuthContext';
+import {
+  fetchDeviceModels,
+  fetchDeviceTypes,
+  fetchDevices,
+  fetchRoles,
+  fetchServiceTypes,
+  fetchStatuses,
+  fetchUsers,
+} from '../../../lib/referenceApi';
+import {
+  getServiceRequestEntityTypeId,
+  getStatusByCode,
+} from '../../../lib/statusHelpers';
+import { toISODate } from '../../../lib/formatters';
 
 const CreateRequest = () => {
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [submitError, setSubmitError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+
+  const [deviceTypes, setDeviceTypes] = useState([]);
+  const [deviceModels, setDeviceModels] = useState([]);
+  const [devices, setDevices] = useState([]);
+  const [serviceTypes, setServiceTypes] = useState([]);
+  const [admins, setAdmins] = useState([]);
+  const [pendingStatusId, setPendingStatusId] = useState(null);
+
   const [form, setForm] = useState({
-    deviceType: 'Laptop',
-    brand: 'Lenovo',
-    model: 'Lenovo V14',
-    serialNumber: 'KMBT123098MTCS',
-    serviceType: 'Hardware',
-    description: 'Keyboard nya rada rusak',
-    photoName: '',
+    deviceTypeId: '',
+    brand: '',
+    deviceModelId: '',
+    deviceId: '',
+    serviceTypeId: '',
+    adminId: '',
+    description: '',
+    photos: [],
   });
 
-  const availableModels = useMemo(
-    () => MODEL_OPTIONS[form.brand] || MODEL_OPTIONS.Lainnya,
-    [form.brand]
-  );
+  useEffect(() => {
+    const loadReferences = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const [types, models, deviceList, serviceList, roles, statuses] =
+          await Promise.all([
+            fetchDeviceTypes(),
+            fetchDeviceModels(),
+            fetchDevices(),
+            fetchServiceTypes(),
+            fetchRoles(),
+            fetchStatuses(),
+          ]);
 
-  const handleDeviceSelect = (device) => {
+        setDeviceTypes(types);
+        setDeviceModels(models);
+        setDevices(deviceList);
+        setServiceTypes(serviceList);
+
+        const adminRole = roles.find((role) => role.name === 'admin');
+        if (adminRole?.id) {
+          const adminList = await fetchUsers(`role_id=${adminRole.id}`);
+          setAdmins(adminList);
+        }
+
+        const serviceRequestEntityTypeId =
+          getServiceRequestEntityTypeId(statuses);
+        const pendingStatus = getStatusByCode(
+          statuses,
+          serviceRequestEntityTypeId,
+          'PENDING'
+        );
+        setPendingStatusId(pendingStatus?.id || null);
+      } catch (err) {
+        setError(err.message || 'Gagal memuat data referensi.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadReferences();
+  }, []);
+
+  const deviceTypeOptions = useMemo(() => deviceTypes, [deviceTypes]);
+
+  const brandOptions = useMemo(() => {
+    if (!form.deviceTypeId) return [];
+    const brands = deviceModels
+      .filter((model) => model.device_type_id === Number(form.deviceTypeId))
+      .map((model) => model.brand);
+    return Array.from(new Set(brands)).filter(Boolean);
+  }, [deviceModels, form.deviceTypeId]);
+
+  const modelOptions = useMemo(() => {
+    if (!form.deviceTypeId || !form.brand) return [];
+    return deviceModels.filter(
+      (model) =>
+        model.device_type_id === Number(form.deviceTypeId) &&
+        model.brand === form.brand
+    );
+  }, [deviceModels, form.brand, form.deviceTypeId]);
+
+  const deviceOptions = useMemo(() => {
+    if (!form.deviceModelId) return [];
+    return devices.filter(
+      (device) => device.device_model_id === Number(form.deviceModelId)
+    );
+  }, [devices, form.deviceModelId]);
+
+  useEffect(() => {
+    if (!form.deviceTypeId && deviceTypeOptions.length) {
+      setForm((prev) => ({
+        ...prev,
+        deviceTypeId: deviceTypeOptions[0].id,
+      }));
+    }
+  }, [deviceTypeOptions, form.deviceTypeId]);
+
+  useEffect(() => {
+    if (brandOptions.length && !brandOptions.includes(form.brand)) {
+      setForm((prev) => ({
+        ...prev,
+        brand: brandOptions[0],
+      }));
+    }
+  }, [brandOptions, form.brand]);
+
+  useEffect(() => {
+    if (modelOptions.length) {
+      const nextModel = modelOptions[0];
+      if (Number(form.deviceModelId) !== nextModel.id) {
+        setForm((prev) => ({
+          ...prev,
+          deviceModelId: nextModel.id,
+        }));
+      }
+    }
+  }, [form.deviceModelId, modelOptions]);
+
+  useEffect(() => {
+    if (deviceOptions.length) {
+      const nextDevice = deviceOptions[0];
+      if (Number(form.deviceId) !== nextDevice.id) {
+        setForm((prev) => ({
+          ...prev,
+          deviceId: nextDevice.id,
+        }));
+      }
+    } else if (form.deviceId) {
+      setForm((prev) => ({
+        ...prev,
+        deviceId: '',
+      }));
+    }
+  }, [deviceOptions, form.deviceId]);
+
+  useEffect(() => {
+    if (!form.serviceTypeId && serviceTypes.length) {
+      setForm((prev) => ({
+        ...prev,
+        serviceTypeId: serviceTypes[0].id,
+      }));
+    }
+  }, [form.serviceTypeId, serviceTypes]);
+
+  useEffect(() => {
+    if (!form.adminId && admins.length) {
+      setForm((prev) => ({
+        ...prev,
+        adminId: admins[0].id,
+      }));
+    }
+  }, [admins, form.adminId]);
+
+  const handleDeviceSelect = (deviceTypeId) => {
     setForm((prev) => ({
       ...prev,
-      deviceType: device === '+' ? 'Lainnya' : device,
-    }));
-  };
-
-  const handleBrandChange = (event) => {
-    const brand = event.target.value;
-    const nextModel =
-      (MODEL_OPTIONS[brand] && MODEL_OPTIONS[brand][0]) || 'Lainnya';
-
-    setForm((prev) => ({
-      ...prev,
-      brand,
-      model: nextModel,
+      deviceTypeId,
+      brand: '',
+      deviceModelId: '',
+      deviceId: '',
     }));
   };
 
   const handleFieldChange = (field) => (event) => {
+    const value = event.target.value;
     setForm((prev) => ({
       ...prev,
-      [field]: event.target.value,
+      [field]: value,
     }));
   };
 
   const handlePhotoChange = (event) => {
-    const file = event.target.files?.[0];
+    const files = Array.from(event.target.files || []);
     setForm((prev) => ({
       ...prev,
-      photoName: file ? file.name : '',
+      photos: files,
     }));
   };
 
   const handleBack = () => {
     setStep((prev) => Math.max(1, prev - 1));
+  };
+
+  const handleSubmit = async () => {
+    setSubmitError('');
+    setSuccessMessage('');
+
+    if (!user?.id) {
+      setSubmitError('User belum terautentikasi.');
+      return;
+    }
+
+    if (!form.adminId) {
+      setSubmitError('Admin PIC wajib dipilih.');
+      return;
+    }
+
+    if (!form.serviceTypeId) {
+      setSubmitError('Jenis service wajib dipilih.');
+      return;
+    }
+
+    if (!form.deviceId) {
+      setSubmitError('Device wajib dipilih.');
+      return;
+    }
+
+    if (!form.description.trim()) {
+      setSubmitError('Keterangan kerusakan wajib diisi.');
+      return;
+    }
+
+    if (!pendingStatusId) {
+      setSubmitError('Status PENDING tidak tersedia di backend.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('user_id', String(user.id));
+    formData.append('admin_id', String(form.adminId));
+    formData.append('service_type_id', String(form.serviceTypeId));
+    formData.append('status_id', String(pendingStatusId));
+    formData.append('request_date', toISODate());
+    formData.append('details[0][device_id]', String(form.deviceId));
+    formData.append('details[0][complaint]', form.description.trim());
+
+    form.photos.forEach((file, index) => {
+      formData.append(`details[0][complaint_images][${index}]`, file);
+    });
+
+    try {
+      setLoading(true);
+      const res = await apiRequest('/service-requests', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok || res.data?.success === false) {
+        throw new Error(parseApiError(res.data, 'Gagal mengirim request.'));
+      }
+
+      setSuccessMessage('Request berhasil dikirim.');
+      setStep(1);
+      setForm((prev) => ({
+        ...prev,
+        description: '',
+        photos: [],
+      }));
+    } catch (err) {
+      setSubmitError(err.message || 'Gagal mengirim request.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handlePrimary = () => {
@@ -93,7 +293,7 @@ const CreateRequest = () => {
       return;
     }
 
-    console.log('Submit request', form);
+    handleSubmit();
   };
 
   const steps = [
@@ -101,6 +301,24 @@ const CreateRequest = () => {
     { id: 2, icon: 'bi-wrench-adjustable' },
     { id: 3, icon: 'bi-file-earmark-text' },
   ];
+
+  const selectedDeviceType = deviceTypes.find(
+    (item) => item.id === Number(form.deviceTypeId)
+  );
+  const selectedModel = deviceModels.find(
+    (item) => item.id === Number(form.deviceModelId)
+  );
+  const selectedDevice = devices.find(
+    (item) => item.id === Number(form.deviceId)
+  );
+  const selectedServiceType = serviceTypes.find(
+    (item) => item.id === Number(form.serviceTypeId)
+  );
+
+  const photoLabel =
+    form.photos.length > 0
+      ? form.photos.map((file) => file.name).join(', ')
+      : '';
 
   return (
     <div className="create-request">
@@ -140,6 +358,11 @@ const CreateRequest = () => {
         })}
       </div>
 
+      {error && <div className="create-request-error">{error}</div>}
+      {successMessage && (
+        <div className="create-request-success">{successMessage}</div>
+      )}
+
       {step === 1 && (
         <>
           <section className="request-card">
@@ -149,22 +372,18 @@ const CreateRequest = () => {
             </div>
 
             <div className="device-grid">
-              {DEVICE_OPTIONS.map((device) => {
-                const isAdd = device === '+';
+              {deviceTypeOptions.map((device) => {
                 const isActive =
-                  form.deviceType === device ||
-                  (isAdd && form.deviceType === 'Lainnya');
+                  Number(form.deviceTypeId) === Number(device.id);
 
                 return (
                   <button
-                    key={device}
+                    key={device.id}
                     type="button"
-                    className={`device-btn ${isActive ? 'active' : ''} ${
-                      isAdd ? 'device-add' : ''
-                    }`}
-                    onClick={() => handleDeviceSelect(device)}
+                    className={`device-btn ${isActive ? 'active' : ''}`}
+                    onClick={() => handleDeviceSelect(device.id)}
                   >
-                    {device}
+                    {device.name}
                   </button>
                 );
               })}
@@ -174,8 +393,8 @@ const CreateRequest = () => {
           <section className="request-card">
             <div className="card-title">Brand/ Merk</div>
             <div className="field">
-              <select value={form.brand} onChange={handleBrandChange}>
-                {BRAND_OPTIONS.map((brand) => (
+              <select value={form.brand} onChange={handleFieldChange('brand')}>
+                {brandOptions.map((brand) => (
                   <option key={brand} value={brand}>
                     {brand}
                   </option>
@@ -187,10 +406,13 @@ const CreateRequest = () => {
           <section className="request-card">
             <div className="card-title">Model</div>
             <div className="field">
-              <select value={form.model} onChange={handleFieldChange('model')}>
-                {availableModels.map((model) => (
-                  <option key={model} value={model}>
-                    {model}
+              <select
+                value={form.deviceModelId}
+                onChange={handleFieldChange('deviceModelId')}
+              >
+                {modelOptions.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.model}
                   </option>
                 ))}
               </select>
@@ -200,12 +422,16 @@ const CreateRequest = () => {
           <section className="request-card">
             <div className="card-title">Serial Number</div>
             <div className="field">
-              <input
-                type="text"
-                placeholder="Serial number"
-                value={form.serialNumber}
-                onChange={handleFieldChange('serialNumber')}
-              />
+              <select
+                value={form.deviceId}
+                onChange={handleFieldChange('deviceId')}
+              >
+                {deviceOptions.map((device) => (
+                  <option key={device.id} value={device.id}>
+                    {device.serial_number}
+                  </option>
+                ))}
+              </select>
             </div>
           </section>
         </>
@@ -219,12 +445,23 @@ const CreateRequest = () => {
           <div className="field">
             <label>Jenis Service</label>
             <select
-              value={form.serviceType}
-              onChange={handleFieldChange('serviceType')}
+              value={form.serviceTypeId}
+              onChange={handleFieldChange('serviceTypeId')}
             >
-              {SERVICE_OPTIONS.map((service) => (
-                <option key={service} value={service}>
-                  {service}
+              {serviceTypes.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="field">
+            <label>Admin PIC</label>
+            <select value={form.adminId} onChange={handleFieldChange('adminId')}>
+              {admins.map((admin) => (
+                <option key={admin.id} value={admin.id}>
+                  {admin.name}
                 </option>
               ))}
             </select>
@@ -243,10 +480,10 @@ const CreateRequest = () => {
             <label className="upload-box">
               <i className="bi bi-image"></i>
               <span>Klik untuk upload foto</span>
-              {form.photoName && (
-                <span className="upload-name">{form.photoName}</span>
+              {photoLabel && (
+                <span className="upload-name">{photoLabel}</span>
               )}
-              <input type="file" onChange={handlePhotoChange} />
+              <input type="file" multiple onChange={handlePhotoChange} />
             </label>
           </div>
         </section>
@@ -261,37 +498,45 @@ const CreateRequest = () => {
               <div className="confirm-photo-block">
                 <div className="confirm-label">Foto Perangkat</div>
                 <div className="confirm-photo">
-                  {form.photoName ? form.photoName : 'Foto Perangkat'}
+                  {photoLabel || 'Foto Perangkat'}
                 </div>
               </div>
 
               <div className="confirm-rows">
                 <div className="confirm-row">
                   <span className="confirm-key">Perangkat</span>
-                  <span className="confirm-value">{form.deviceType}</span>
+                  <span className="confirm-value">
+                    {selectedDeviceType?.name || '-'}
+                  </span>
                 </div>
                 <div className="confirm-row">
                   <span className="confirm-key">Merk</span>
-                  <span className="confirm-value">{form.brand}</span>
+                  <span className="confirm-value">{form.brand || '-'}</span>
                 </div>
                 <div className="confirm-row">
                   <span className="confirm-key">Model</span>
-                  <span className="confirm-value">{form.model}</span>
+                  <span className="confirm-value">
+                    {selectedModel?.model || '-'}
+                  </span>
                 </div>
                 <div className="confirm-row">
                   <span className="confirm-key">Jenis Service</span>
-                  <span className="confirm-value">{form.serviceType}</span>
+                  <span className="confirm-value">
+                    {selectedServiceType?.name || '-'}
+                  </span>
                 </div>
                 <div className="confirm-row">
                   <span className="confirm-key">Serial Number</span>
-                  <span className="confirm-value">{form.serialNumber}</span>
+                  <span className="confirm-value">
+                    {selectedDevice?.serial_number || '-'}
+                  </span>
                 </div>
               </div>
             </div>
 
             <div className="confirm-notes">
               <div className="confirm-label">Keterangan</div>
-              <div className="confirm-text">{form.description}</div>
+              <div className="confirm-text">{form.description || '-'}</div>
             </div>
           </section>
 
@@ -307,19 +552,26 @@ const CreateRequest = () => {
         </div>
       )}
 
+      {submitError && <div className="create-request-error">{submitError}</div>}
+
       <div className="request-actions">
         <button
           type="button"
           className="btn-ghost"
           onClick={handleBack}
-          disabled={step === 1}
+          disabled={step === 1 || loading}
         >
           <img src={backIcon} alt="Back" />
           Back
         </button>
 
-        <button type="button" className="btn-primary" onClick={handlePrimary}>
-          {step === 1 ? 'Next' : 'Submit'}
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={handlePrimary}
+          disabled={loading}
+        >
+          {step === 1 ? 'Next' : step === 2 ? 'Next' : 'Submit'}
           <img src={nextIcon} alt="Next" />
         </button>
       </div>

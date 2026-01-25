@@ -1,3 +1,5 @@
+import { getStoredToken } from './authStorage';
+
 const normalizeBaseUrl = (baseUrl) => baseUrl.replace(/\/+$/, '');
 
 const resolveBaseUrl = () => {
@@ -35,8 +37,9 @@ export const apiRequest = async (path, options = {}) => {
   const requestHeaders = { ...(headers || {}) };
   const requestOptions = { method, headers: requestHeaders };
 
-  if (token) {
-    requestHeaders.Authorization = `Bearer ${token}`;
+  const resolvedToken = token || getStoredToken();
+  if (resolvedToken) {
+    requestHeaders.Authorization = `Bearer ${resolvedToken}`;
   }
 
   if (body instanceof FormData) {
@@ -45,6 +48,8 @@ export const apiRequest = async (path, options = {}) => {
     requestHeaders['Content-Type'] = 'application/json';
     requestOptions.body = JSON.stringify(body);
   }
+
+  requestHeaders.Accept = 'application/json';
 
   const response = await fetch(buildApiUrl(path), requestOptions);
   const contentType = response.headers.get('content-type') || '';
@@ -57,4 +62,18 @@ export const apiRequest = async (path, options = {}) => {
   }
 
   return { ok: response.ok, status: response.status, data };
+};
+
+export const parseApiError = (payload, fallback = 'Request gagal.') => {
+  if (!payload) return fallback;
+  if (typeof payload === 'string') return payload;
+  if (payload.message) return payload.message;
+  if (payload.errors) {
+    try {
+      return JSON.stringify(payload.errors);
+    } catch (error) {
+      return fallback;
+    }
+  }
+  return fallback;
 };

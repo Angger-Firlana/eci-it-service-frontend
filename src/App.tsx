@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import './App.css';
 import Layout from './layouts/Layout/Layout';
 import UserDashboard from './pages/user/Dashboard/Dashboard';
@@ -21,21 +21,41 @@ import AdminManageUsers from './pages/admin/ManageUsers/ManageUsers';
 import AdminMasterData from './pages/admin/MasterData/MasterData';
 import { ADMIN_MENU_ITEMS, ATASAN_MENU_ITEMS, USER_MENU_ITEMS } from './constants';
 import Login from './pages/auth/Login';
+import { useAuth } from './contexts/AuthContext';
 
 function App() {
-  const [activeRoute, setActiveRoute] = useState('/create-request');
-  const [role, setRole] = useState(null);
+  const [activeRoute, setActiveRoute] = useState('/dashboard');
   const [detailVariant, setDetailVariant] = useState('progress');
   const [adminInboxVariant, setAdminInboxVariant] = useState('approval');
+  const [selectedRequestId, setSelectedRequestId] = useState(null);
+  const { user: authUser, loading: authLoading, logout } = useAuth();
+
+  const resolvedRole = useMemo(() => {
+    const roleName = authUser?.role?.name || authUser?.role || 'user';
+    if (roleName === 'superior') return 'atasan';
+    if (roleName === 'technician') return 'technician';
+    return roleName;
+  }, [authUser]);
+
+  useEffect(() => {
+    if (!authUser) {
+      setActiveRoute('/dashboard');
+      setSelectedRequestId(null);
+      setDetailVariant('progress');
+      setAdminInboxVariant('approval');
+    }
+  }, [authUser]);
 
   const user = useMemo(
     () => ({
-      name: 'Toni Apalah',
-      email: 'Toni@gmail.com',
-      role: role ? role.charAt(0).toUpperCase() + role.slice(1) : 'User',
-      department: role === 'atasan' || role === 'admin' ? 'IT' : 'ECOMERS',
+      name: authUser?.name || 'User',
+      email: authUser?.email || 'user@example.com',
+      role: authUser?.role?.name
+        ? authUser.role.name.charAt(0).toUpperCase() + authUser.role.name.slice(1)
+        : resolvedRole.charAt(0).toUpperCase() + resolvedRole.slice(1),
+      department: authUser?.department?.code || authUser?.department?.name || '-',
     }),
-    [role]
+    [authUser, resolvedRole]
   );
 
   const sidebarRoute = useMemo(() => {
@@ -50,17 +70,17 @@ function App() {
   }, [activeRoute]);
 
   const menuItems = useMemo(() => {
-    if (role === 'atasan') {
+    if (resolvedRole === 'atasan') {
       return ATASAN_MENU_ITEMS;
     }
-    if (role === 'admin') {
+    if (resolvedRole === 'admin') {
       return ADMIN_MENU_ITEMS;
     }
     return USER_MENU_ITEMS;
-  }, [role]);
+  }, [resolvedRole]);
 
   const content = useMemo(() => {
-    if (role === 'admin') {
+    if (resolvedRole === 'admin') {
       switch (activeRoute) {
         case '/dashboard':
           return <AdminDashboard user={user} />;
@@ -69,18 +89,25 @@ function App() {
         case '/service-list':
           return (
             <AdminServiceList
-              onViewDetail={() => setActiveRoute('/service-list/detail')}
+              onViewDetail={(row) => {
+                setSelectedRequestId(row?.id || null);
+                setActiveRoute('/service-list/detail');
+              }}
             />
           );
         case '/service-list/detail':
           return (
-            <AdminServiceDetail onBack={() => setActiveRoute('/service-list')} />
+            <AdminServiceDetail
+              requestId={selectedRequestId}
+              onBack={() => setActiveRoute('/service-list')}
+            />
           );
         case '/inbox':
           return (
             <AdminInbox
               onViewDetail={(row) => {
                 setAdminInboxVariant(row?.variant || 'approval');
+                setSelectedRequestId(row?.id || null);
                 setActiveRoute('/inbox/detail');
               }}
             />
@@ -89,6 +116,7 @@ function App() {
           return (
             <AdminInboxDetail
               variant={adminInboxVariant}
+              requestId={selectedRequestId}
               onBack={() => setActiveRoute('/inbox')}
             />
           );
@@ -103,7 +131,7 @@ function App() {
       }
     }
 
-    if (role === 'atasan') {
+    if (resolvedRole === 'atasan') {
       switch (activeRoute) {
         case '/dashboard':
           return <AtasanDashboard user={user} />;
@@ -112,6 +140,7 @@ function App() {
             <AtasanServiceList
               onViewDetail={(row) => {
                 setDetailVariant(row?.detailVariant || 'progress');
+                setSelectedRequestId(row?.id || null);
                 setActiveRoute('/service-list/detail');
               }}
             />
@@ -120,6 +149,7 @@ function App() {
           return (
             <AtasanServiceDetail
               variant={detailVariant}
+              requestId={selectedRequestId}
               onBack={() => setActiveRoute('/service-list')}
             />
           );
@@ -140,12 +170,18 @@ function App() {
       case '/service-list':
         return (
           <UserServiceList
-            onViewDetail={() => setActiveRoute('/service-list/detail')}
+            onViewDetail={(row) => {
+              setSelectedRequestId(row?.id || null);
+              setActiveRoute('/service-list/detail');
+            }}
           />
         );
       case '/service-list/detail':
         return (
-          <UserServiceDetail onBack={() => setActiveRoute('/service-list')} />
+          <UserServiceDetail
+            requestId={selectedRequestId}
+            onBack={() => setActiveRoute('/service-list')}
+          />
         );
       case '/calendar':
         return <UserCalendar />;
@@ -154,14 +190,13 @@ function App() {
     }
   }, [activeRoute, adminInboxVariant, detailVariant, role, user]);
 
-  if (!role) {
+  if (authLoading) {
+    return <div className="app-loading">Loading...</div>;
+  }
+
+  if (!authUser) {
     return (
-      <Login
-        onLogin={(selectedRole) => {
-          setRole(selectedRole);
-          setActiveRoute('/dashboard');
-        }}
-      />
+      <Login />
     );
   }
 
@@ -172,12 +207,9 @@ function App() {
       user={user}
       menuItems={menuItems}
       onLogout={() => {
-        setRole(null);
-        setActiveRoute('/create-request');
-        setDetailVariant('progress');
-        setAdminInboxVariant('approval');
+        logout();
       }}
-      className={role === 'atasan' ? 'theme-atasan' : ''}
+      className={resolvedRole === 'atasan' ? 'theme-atasan' : ''}
     >
       {content}
     </Layout>

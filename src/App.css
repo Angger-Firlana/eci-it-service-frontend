@@ -18,3 +18,12 @@
   margin: 0;
   font-size: 13px;
 }
+
+.app-loading {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Poppins', sans-serif;
+  color: #4b4b4b;
+}

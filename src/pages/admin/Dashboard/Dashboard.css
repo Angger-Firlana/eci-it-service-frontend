@@ -5,3 +5,11 @@
   padding-bottom: 24px;
   font-family: 'Poppins', sans-serif;
 }
+
+.dashboard-error {
+  background: #ffe7e7;
+  color: #b40000;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 12px;
+}

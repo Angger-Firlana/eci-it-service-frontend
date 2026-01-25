@@ -2,20 +2,11 @@ import React from 'react';
 import './RequestItem.css';
 import Badge from '../../../common/Badge/Badge';
 import eyeIcon from '../../../../assets/icons/lihatdetail(eye).svg';
+import { mapStatusVariant } from '../../../../lib/statusHelpers';
 
 const RequestItem = ({ item, onViewDetails }) => {
-  const getStatusVariant = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'menunggu approve':
-        return 'waiting';
-      case 'proses':
-        return 'process';
-      case 'selesai':
-        return 'completed';
-      default:
-        return 'default';
-    }
-  };
+  const statusVariant =
+    item.statusVariant || mapStatusVariant(item.statusCode || item.status);
 
   return (
     <div className="request-item">
@@ -46,7 +37,7 @@ const RequestItem = ({ item, onViewDetails }) => {
         </div>
 
         <div className="req-right">
-          <Badge label={item.status} variant={getStatusVariant(item.status)} />
+          <Badge label={item.status} variant={statusVariant} />
           <span className="date">{item.date}</span>
         </div>
       </div>

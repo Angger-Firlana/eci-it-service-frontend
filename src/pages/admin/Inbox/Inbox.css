@@ -104,6 +104,26 @@
   color: #6b6b6b;
 }
 
+.admin-status.status-waiting {
+  color: #f39c12;
+  font-weight: 600;
+}
+
+.admin-status.status-process {
+  color: #2980b9;
+  font-weight: 600;
+}
+
+.admin-status.status-completed {
+  color: #27ae60;
+  font-weight: 600;
+}
+
+.admin-status.status-rejected {
+  color: #c0392b;
+  font-weight: 600;
+}
+
 .admin-actions {
   display: flex;
   align-items: center;

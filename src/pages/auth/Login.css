@@ -76,6 +76,15 @@
   cursor: pointer;
 }
 
+.login-error {
+  background: #ffe7e7;
+  color: #b40000;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  text-align: center;
+}
+
 .login-alt {
   display: flex;
   flex-direction: column;

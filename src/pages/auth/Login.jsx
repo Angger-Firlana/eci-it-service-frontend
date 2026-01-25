@@ -1,15 +1,32 @@
 import React, { useState } from 'react';
 import './Login.css';
 import robotImg from '../../assets/images/login_maskot.png';
+import { useAuth } from '../../contexts/AuthContext';
 
-const Login = ({ onLogin }) => {
+const Login = () => {
   const [credentials, setCredentials] = useState({ email: '', password: '' });
+  const [error, setError] = useState('');
+  const [isSubmitting, setSubmitting] = useState(false);
+  const { login } = useAuth();
 
   const handleCredentialChange = (field) => (event) => {
     setCredentials((prev) => ({
       ...prev,
       [field]: event.target.value,
     }));
+  };
+
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
+    setError('');
+    setSubmitting(true);
+    try {
+      await login(credentials);
+    } catch (err) {
+      setError(err.message || 'Login gagal.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -41,33 +58,11 @@ const Login = ({ onLogin }) => {
           />
         </label>
 
-        <button className="login-btn" type="button" onClick={() => onLogin?.('user')}>
-          Login
-        </button>
+        {error && <div className="login-error">{error}</div>}
 
-        <div className="login-alt">
-          <button
-            type="button"
-            className="login-alt-btn"
-            onClick={() => onLogin?.('user')}
-          >
-            Login sebagai User
-          </button>
-          <button
-            type="button"
-            className="login-alt-btn"
-            onClick={() => onLogin?.('atasan')}
-          >
-            Login sebagai Atasan
-          </button>
-          <button
-            type="button"
-            className="login-alt-btn"
-            onClick={() => onLogin?.('admin')}
-          >
-            Login sebagai Admin
-          </button>
-        </div>
+        <button className="login-btn" type="button" onClick={handleSubmit}>
+          {isSubmitting ? 'Memproses...' : 'Login'}
+        </button>
 
         <img src={robotImg} alt="" className="login-robot" />
       </div>

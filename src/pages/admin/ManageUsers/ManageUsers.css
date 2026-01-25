@@ -5,6 +5,14 @@
   font-family: 'Poppins', sans-serif;
 }
 
+.admin-users-error {
+  background: #ffe7e7;
+  color: #b40000;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 12px;
+}
+
 .admin-users-header {
   display: flex;
   align-items: center;
@@ -215,6 +223,15 @@
   font-family: 'Poppins', sans-serif;
 }
 
+.admin-users-form select {
+  border: 1px solid #D9D9D9;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: 'Poppins', sans-serif;
+  background: #fff;
+}
+
 .admin-users-actions {
   display: flex;
   justify-content: flex-end;
@@ -239,6 +256,12 @@
   padding: 6px 12px;
   font-size: 12px;
   cursor: pointer;
+}
+
+.admin-users-note {
+  font-size: 11px;
+  color: #6b6b6b;
+  text-align: center;
 }
 
 @media (max-width: 900px) {

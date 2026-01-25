@@ -37,3 +37,9 @@
   color: #22C55E;
   background-color: #F0FDF4;
 }
+
+.badge-rejected {
+  border-color: #EF4444;
+  color: #EF4444;
+  background-color: #FEF2F2;
+}

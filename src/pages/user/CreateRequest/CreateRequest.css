@@ -35,6 +35,25 @@
   margin: 8px auto 10px;
 }
 
+.create-request .create-request-error,
+.create-request .create-request-success {
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  text-align: center;
+  font-family: 'Poppins', sans-serif;
+}
+
+.create-request .create-request-error {
+  background: #ffe7e7;
+  color: #b40000;
+}
+
+.create-request .create-request-success {
+  background: #e7f6ee;
+  color: #1e824c;
+}
+
 .create-request .stepper-item {
   display: flex;
   align-items: center;
