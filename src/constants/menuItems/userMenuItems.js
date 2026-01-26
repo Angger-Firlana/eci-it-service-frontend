@@ -20,14 +20,14 @@ export const USER_MENU_ITEMS = [
     label: 'Buat Request',
     icon: makeIcon,
     iconActive: makeSelectedIcon,
-    route: '/create-request',
+    route: '/service-requests/new',
   },
   {
     id: 'service-list',
     label: 'Service List',
     icon: listIcon,
     iconActive: listSelectedIcon,
-    route: '/service-list',
+    route: '/service-requests',
   },
   {
     id: 'calendar',

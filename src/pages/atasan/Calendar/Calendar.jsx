@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './Calendar.css';
 import { apiRequest, unwrapApiData, parseApiError } from '../../../lib/api';
 import { formatDate, toISODate } from '../../../lib/formatters';
@@ -6,6 +7,7 @@ import { fetchDeviceModels, fetchDeviceTypes } from '../../../lib/referenceApi';
 import { getDeviceSummary, getPrimaryDetail } from '../../../lib/serviceRequestUtils';
 
 const Calendar = () => {
+  const navigate = useNavigate();
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -176,13 +178,18 @@ const Calendar = () => {
             <div className="atasan-side-empty">Tidak ada request.</div>
           )}
           {mappedRequests.map((item) => (
-            <div className="atasan-side-card" key={item.id}>
+            <button
+              className="atasan-side-card"
+              key={item.id}
+              type="button"
+              onClick={() => navigate(`/service-requests/${item.id}?from=calendar&variant=progress`)}
+            >
               <div className="atasan-side-title-row">
                 <span>{item.device}</span>
                 <span className="atasan-side-status">{item.status}</span>
               </div>
               <div className="atasan-side-sub">{item.model}</div>
-            </div>
+            </button>
           ))}
         </aside>
       </div>

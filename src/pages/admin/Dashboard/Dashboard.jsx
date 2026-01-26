@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './Dashboard.css';
 import HeroSection from '../../../components/user/dashboard/HeroSection/HeroSection';
 import RequestList from '../../../components/user/dashboard/RequestList/RequestList';
@@ -9,6 +10,7 @@ import { buildRequestTitle, getPrimaryDetail } from '../../../lib/serviceRequest
 import { formatDate } from '../../../lib/formatters';
 
 const Dashboard = ({ user }) => {
+  const navigate = useNavigate();
   const [requests, setRequests] = useState([]);
   const [deviceModels, setDeviceModels] = useState([]);
   const [deviceTypes, setDeviceTypes] = useState([]);
@@ -73,8 +75,11 @@ const Dashboard = ({ user }) => {
 
       <RequestList
         requests={requestItems}
-        onViewAll={() => {}}
-        onViewDetails={() => {}}
+        onViewAll={() => navigate('/service-requests')}
+        onViewDetails={(request) => {
+          if (!request?.id) return;
+          navigate(`/service-requests/${request.id}?from=service-requests`);
+        }}
       />
     </div>
   );

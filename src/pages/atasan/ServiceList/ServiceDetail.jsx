@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import './ServiceDetail.css';
 import backIcon from '../../../assets/icons/back.svg';
 import {
@@ -6,6 +7,7 @@ import {
   unwrapApiData,
   parseApiError,
   buildApiUrl,
+  clearRequestCache,
 } from '../../../lib/api';
 import {
   fetchDeviceModels,
@@ -17,8 +19,13 @@ import { getDeviceSummary, getPrimaryDetail } from '../../../lib/serviceRequestU
 import { useAuth } from '../../../contexts/AuthContext';
 import { getVendorApprovalEntityTypeId } from '../../../lib/statusHelpers';
 
-const ServiceDetail = ({ onBack, variant = 'progress', requestId }) => {
+const ServiceDetail = ({ onBack, variant, requestId }) => {
+  const params = useParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const resolvedRequestId = requestId || params.id;
+  const resolvedVariant = variant || searchParams.get('variant') || 'progress';
   const [detail, setDetail] = useState(null);
   const [locations, setLocations] = useState([]);
   const [costs, setCosts] = useState([]);
@@ -50,16 +57,16 @@ const ServiceDetail = ({ onBack, variant = 'progress', requestId }) => {
   }, []);
 
   useEffect(() => {
-    if (!requestId) return;
+    if (!resolvedRequestId) return;
     const loadDetail = async () => {
       setLoading(true);
       setError('');
       try {
         const [detailRes, locationRes, costRes, approvalRes] = await Promise.all([
-          apiRequest(`/service-requests/${requestId}`),
-          apiRequest(`/service-requests/${requestId}/locations`),
-          apiRequest(`/service-requests/${requestId}/costs`),
-          apiRequest(`/service-requests/${requestId}/approvals`),
+          apiRequest(`/service-requests/${resolvedRequestId}`),
+          apiRequest(`/service-requests/${resolvedRequestId}/locations`),
+          apiRequest(`/service-requests/${resolvedRequestId}/costs`),
+          apiRequest(`/service-requests/${resolvedRequestId}/approvals`),
         ]);
 
         if (!detailRes.ok || detailRes.data?.success === false) {
@@ -90,7 +97,7 @@ const ServiceDetail = ({ onBack, variant = 'progress', requestId }) => {
       }
     };
     loadDetail();
-  }, [requestId]);
+  }, [resolvedRequestId]);
 
   const statusMap = useMemo(() => {
     return statuses.reduce((acc, status) => {
@@ -162,7 +169,8 @@ const ServiceDetail = ({ onBack, variant = 'progress', requestId }) => {
         throw new Error(parseApiError(res.data, 'Gagal memproses approval.'));
       }
 
-      const approvalRes = await apiRequest(`/service-requests/${requestId}/approvals`);
+      clearRequestCache('service-requests');
+      const approvalRes = await apiRequest(`/service-requests/${resolvedRequestId}/approvals`);
       if (approvalRes.ok && approvalRes.data?.success !== false) {
         const payload = unwrapApiData(approvalRes.data);
         setApprovals(Array.isArray(payload) ? payload : []);
@@ -190,7 +198,20 @@ const ServiceDetail = ({ onBack, variant = 'progress', requestId }) => {
     });
   }, [detail, statusMap]);
 
-  const showActions = variant === 'approval' && pendingApproval;
+  const showActions = resolvedVariant === 'approval' && pendingApproval;
+
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+    const from = searchParams.get('from');
+    if (from === 'inbox') {
+      navigate('/inbox');
+      return;
+    }
+    navigate('/service-requests');
+  };
 
   return (
     <div className="atasan-detail-page">
@@ -198,7 +219,7 @@ const ServiceDetail = ({ onBack, variant = 'progress', requestId }) => {
         <button
           className="atasan-detail-back"
           type="button"
-          onClick={() => onBack?.()}
+          onClick={handleBack}
         >
           <img src={backIcon} alt="Back" />
         </button>

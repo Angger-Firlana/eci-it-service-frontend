@@ -26,14 +26,14 @@ export const ADMIN_MENU_ITEMS = [
     label: 'Buat Request',
     icon: makeIcon,
     iconActive: makeSelectedIcon,
-    route: '/create-request',
+    route: '/service-requests/new',
   },
   {
     id: 'service-list',
     label: 'Service List',
     icon: listIcon,
     iconActive: listSelectedIcon,
-    route: '/service-list',
+    route: '/service-requests',
   },
   {
     id: 'inbox',
@@ -60,7 +60,7 @@ export const ADMIN_MENU_ITEMS = [
     label: 'Kelola User',
     icon: kelolaUserIcon,
     iconActive: kelolaUserSelectedIcon,
-    route: '/manage-users',
+    route: '/users',
   },
   {
     id: 'master-data',

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './Dashboard.css';
 import RequestList from '../../../components/user/dashboard/RequestList/RequestList';
 import atasanMascot from '../../../assets/images/atasan_maskot.png';
@@ -8,6 +9,7 @@ import { buildRequestTitle, getPrimaryDetail } from '../../../lib/serviceRequest
 import { formatDate } from '../../../lib/formatters';
 
 const Dashboard = ({ user }) => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({ total: 0, waiting: 0, approved: 0, rejected: 0 });
   const [requests, setRequests] = useState([]);
   const [deviceModels, setDeviceModels] = useState([]);
@@ -133,8 +135,11 @@ const Dashboard = ({ user }) => {
 
       <RequestList
         requests={requestItems}
-        onViewAll={() => {}}
-        onViewDetails={() => {}}
+        onViewAll={() => navigate('/service-requests')}
+        onViewDetails={(request) => {
+          if (!request?.id) return;
+          navigate(`/service-requests/${request.id}?from=service-requests&variant=progress`);
+        }}
       />
     </div>
   );

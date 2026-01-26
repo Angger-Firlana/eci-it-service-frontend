@@ -139,6 +139,13 @@
   gap: 4px;
   font-size: 12px;
   background: #FAFAFA;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+
+.atasan-side-card:focus {
+  outline: none;
 }
 
 .atasan-side-title-row {

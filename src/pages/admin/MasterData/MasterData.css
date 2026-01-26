@@ -27,6 +27,7 @@
   position: absolute;
   top: -18px;
   left: 16px;
+  flex-wrap: wrap;
 }
 
 .admin-master-tab {

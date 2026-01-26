@@ -1,13 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import './ManageUsers.css';
-import { apiRequest, unwrapApiData, parseApiError } from '../../../lib/api';
-import { fetchDepartments, fetchRoles, fetchUsers } from '../../../lib/referenceApi';
+import { apiRequest, unwrapApiData, parseApiError, unwrapApiMeta } from '../../../lib/api';
+import { fetchDepartments, fetchRoles } from '../../../lib/referenceApi';
+import { Pagination } from '../../../components/common';
+
+const DEFAULT_PER_PAGE = 10;
 
 const ManageUsers = () => {
-  const [activeTab, setActiveTab] = useState('user');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(searchParams.get('role') || 'user');
   const [roles, setRoles] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [users, setUsers] = useState([]);
+  const [meta, setMeta] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [mode, setMode] = useState('edit');
   const [form, setForm] = useState({
@@ -16,9 +22,12 @@ const ManageUsers = () => {
     password: '',
     department_id: '',
   });
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(searchParams.get('search') || '');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const page = Number(searchParams.get('page') || 1);
+  const perPage = Number(searchParams.get('per_page') || DEFAULT_PER_PAGE);
 
   useEffect(() => {
     const loadReferences = async () => {
@@ -36,6 +45,11 @@ const ManageUsers = () => {
     loadReferences();
   }, []);
 
+  useEffect(() => {
+    setActiveTab(searchParams.get('role') || 'user');
+    setSearch(searchParams.get('search') || '');
+  }, [searchParams]);
+
   const roleMap = useMemo(() => {
     const map = {};
     roles.forEach((role) => {
@@ -44,26 +58,53 @@ const ManageUsers = () => {
     return map;
   }, [roles]);
 
+  const updateParams = (next) => {
+    const params = new URLSearchParams(searchParams);
+    Object.entries(next).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === '') {
+        params.delete(key);
+      } else {
+        params.set(key, String(value));
+      }
+    });
+    setSearchParams(params);
+  };
+
+  const loadUsers = async () => {
+    setError('');
+    const roleName = activeTab === 'atasan' ? 'superior' : 'user';
+    const roleId = roleMap[roleName];
+    if (!roleId) {
+      setUsers([]);
+      setMeta(null);
+      return;
+    }
+    try {
+      const query = new URLSearchParams();
+      query.set('role_id', String(roleId));
+      query.set('page', String(page));
+      query.set('per_page', String(perPage));
+      if (searchParams.get('search')) {
+        query.set('search', searchParams.get('search'));
+      }
+      const res = await apiRequest(`/users?${query.toString()}`);
+      if (!res.ok || res.data?.success === false) {
+        throw new Error(parseApiError(res.data, 'Gagal memuat user.'));
+      }
+      const payload = unwrapApiData(res.data);
+      const list = Array.isArray(payload) ? payload : [];
+      setUsers(list);
+      setMeta(unwrapApiMeta(res.data));
+      setSelectedId(list[0]?.id || null);
+      setMode('edit');
+    } catch (err) {
+      setError(err.message || 'Gagal memuat user.');
+    }
+  };
+
   useEffect(() => {
-    const loadUsers = async () => {
-      setError('');
-      const roleName = activeTab === 'atasan' ? 'superior' : 'user';
-      const roleId = roleMap[roleName];
-      if (!roleId) {
-        setUsers([]);
-        return;
-      }
-      try {
-        const list = await fetchUsers(`role_id=${roleId}&per_page=50`);
-        setUsers(list);
-        setSelectedId(list[0]?.id || null);
-        setMode('edit');
-      } catch (err) {
-        setError(err.message || 'Gagal memuat user.');
-      }
-    };
     loadUsers();
-  }, [activeTab, roleMap]);
+  }, [activeTab, roleMap, page, perPage, searchParams]);
 
   useEffect(() => {
     const selected = users.find((row) => row.id === selectedId);
@@ -160,10 +201,7 @@ const ManageUsers = () => {
         }
       }
 
-      const refreshed = await fetchUsers(`role_id=${roleMap[roleName]}&per_page=50`);
-      setUsers(refreshed);
-      setSelectedId(refreshed[0]?.id || null);
-      setMode('edit');
+      await loadUsers();
     } catch (err) {
       setError(err.message || 'Gagal menyimpan user.');
     } finally {
@@ -181,10 +219,7 @@ const ManageUsers = () => {
       if (!res.ok || res.data?.success === false) {
         throw new Error(parseApiError(res.data, 'Gagal menghapus user.'));
       }
-      const roleName = activeTab === 'atasan' ? 'superior' : 'user';
-      const refreshed = await fetchUsers(`role_id=${roleMap[roleName]}&per_page=50`);
-      setUsers(refreshed);
-      setSelectedId(refreshed[0]?.id || null);
+      await loadUsers();
     } catch (err) {
       setError(err.message || 'Gagal menghapus user.');
     } finally {
@@ -213,7 +248,7 @@ const ManageUsers = () => {
                 activeTab === 'user' ? 'active' : ''
               }`}
               type="button"
-              onClick={() => setActiveTab('user')}
+              onClick={() => updateParams({ role: 'user', page: 1 })}
             >
               User
             </button>
@@ -222,7 +257,7 @@ const ManageUsers = () => {
                 activeTab === 'atasan' ? 'active' : ''
               }`}
               type="button"
-              onClick={() => setActiveTab('atasan')}
+              onClick={() => updateParams({ role: 'atasan', page: 1 })}
             >
               Atasan
             </button>
@@ -241,7 +276,11 @@ const ManageUsers = () => {
                   placeholder=""
                   aria-label="Search"
                   value={search}
-                  onChange={(event) => setSearch(event.target.value)}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setSearch(value);
+                    updateParams({ search: value, page: 1 });
+                  }}
                 />
                 <i className="bi bi-search"></i>
               </div>
@@ -287,6 +326,11 @@ const ManageUsers = () => {
               </div>
             ))}
           </div>
+
+          <Pagination
+            meta={meta}
+            onPageChange={(nextPage) => updateParams({ page: nextPage })}
+          />
         </section>
 
         <aside className="admin-users-form-card">

@@ -1,261 +1,257 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import './MasterData.css';
-import { Modal } from '../../../components/common';
-import { apiRequest, unwrapApiData, API_BASE_URL } from '../../../lib/api';
+import { Modal, Pagination } from '../../../components/common';
+import { apiRequest, unwrapApiData, unwrapApiMeta, parseApiError } from '../../../lib/api';
+import { clearReferenceCache } from '../../../lib/referenceApi';
 
-const CACHE_TTL_MS = 5 * 60 * 1000;
-const CACHE_KEYS = {
-  deviceTypes: 'eci-masterdata-device-types',
-  deviceModels: 'eci-masterdata-device-models',
-  serviceTypes: 'eci-masterdata-service-types',
-};
+const DEFAULT_PER_PAGE = 10;
 
-const readCache = (key) => {
-  if (typeof window === 'undefined') return null;
-  const raw = window.localStorage.getItem(key);
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw);
-    if (!parsed || !Array.isArray(parsed.data) || !parsed.ts) return null;
-    if (Date.now() - parsed.ts > CACHE_TTL_MS) return null;
-    return parsed.data;
-  } catch (error) {
-    return null;
-  }
-};
-
-const writeCache = (key, data) => {
-  if (typeof window === 'undefined') return;
-  const safeData = Array.isArray(data)
-    ? data.filter((item) => !item?.__optimistic)
-    : [];
-  window.localStorage.setItem(
-    key,
-    JSON.stringify({
-      ts: Date.now(),
-      data: safeData,
-    })
-  );
-};
+const TABS = [
+  { id: 'device-type', label: 'Perangkat' },
+  { id: 'model', label: 'Model' },
+  { id: 'device', label: 'Device' },
+  { id: 'vendor', label: 'Vendor' },
+  { id: 'department', label: 'Departemen' },
+  { id: 'service', label: 'Service' },
+];
 
 const MasterData = () => {
-  const [activeTab, setActiveTab] = useState('device');
-  const [modal, setModal] = useState(null);
-  const [modalMode, setModalMode] = useState('create');
-  const [modalError, setModalError] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'device-type';
+  const search = searchParams.get('search') || '';
+  const page = Number(searchParams.get('page') || 1);
+  const perPage = Number(searchParams.get('per_page') || DEFAULT_PER_PAGE);
+
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [metaMap, setMetaMap] = useState({});
 
   const [deviceTypes, setDeviceTypes] = useState([]);
   const [deviceModels, setDeviceModels] = useState([]);
+  const [devices, setDevices] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [serviceTypes, setServiceTypes] = useState([]);
 
-  const [deviceSearch, setDeviceSearch] = useState('');
-  const [modelSearch, setModelSearch] = useState('');
-  const [serviceSearch, setServiceSearch] = useState('');
+  const [deviceTypeOptions, setDeviceTypeOptions] = useState([]);
+  const [deviceModelOptions, setDeviceModelOptions] = useState([]);
 
-  const [loading, setLoading] = useState({
-    device: false,
-    model: false,
-    service: false,
-  });
-
-  const [errors, setErrors] = useState({
-    device: '',
-    model: '',
-    service: '',
-  });
-
+  const [modal, setModal] = useState(null);
+  const [modalMode, setModalMode] = useState('create');
+  const [modalError, setModalError] = useState('');
   const [editingItem, setEditingItem] = useState(null);
-  const [deviceForm, setDeviceForm] = useState({ name: '' });
-  const [modelForm, setModelForm] = useState({
+  const [reloadToken, setReloadToken] = useState(0);
+
+  const [deviceTypeForm, setDeviceTypeForm] = useState({ name: '' });
+  const [deviceModelForm, setDeviceModelForm] = useState({
     device_type_id: '',
     brand: '',
     model: '',
   });
-  const [serviceForm, setServiceForm] = useState({ name: '' });
+  const [deviceForm, setDeviceForm] = useState({
+    device_model_id: '',
+    serial_number: '',
+  });
+  const [vendorForm, setVendorForm] = useState({
+    name: '',
+    maps_url: '',
+    description: '',
+  });
+  const [departmentForm, setDepartmentForm] = useState({
+    name: '',
+    code: '',
+  });
 
-  const deviceTypeMap = useMemo(() => {
-    return deviceTypes.reduce((acc, item) => {
-      acc[item.id] = item.name;
-      return acc;
-    }, {});
-  }, [deviceTypes]);
-
-  const filteredDeviceTypes = useMemo(() => {
-    const keyword = deviceSearch.trim().toLowerCase();
-    if (!keyword) return deviceTypes;
-    return deviceTypes.filter((item) =>
-      String(item.name || '').toLowerCase().includes(keyword)
-    );
-  }, [deviceSearch, deviceTypes]);
-
-  const filteredDeviceModels = useMemo(() => {
-    const keyword = modelSearch.trim().toLowerCase();
-    if (!keyword) return deviceModels;
-    return deviceModels.filter((item) => {
-      const brand = String(item.brand || '').toLowerCase();
-      const model = String(item.model || '').toLowerCase();
-      return brand.includes(keyword) || model.includes(keyword);
+  const updateParams = (next) => {
+    const params = new URLSearchParams(searchParams);
+    Object.entries(next).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === '') {
+        params.delete(key);
+      } else {
+        params.set(key, String(value));
+      }
     });
-  }, [deviceModels, modelSearch]);
-
-  const filteredServiceTypes = useMemo(() => {
-    const keyword = serviceSearch.trim().toLowerCase();
-    if (!keyword) return serviceTypes;
-    return serviceTypes.filter((item) =>
-      String(item.name || '').toLowerCase().includes(keyword)
-    );
-  }, [serviceSearch, serviceTypes]);
-
-  const getErrorMessage = (payload) => {
-    if (!payload) return 'Request gagal.';
-    if (typeof payload === 'string') return payload;
-    if (payload.message) return payload.message;
-    if (payload.errors) {
-      try {
-        return JSON.stringify(payload.errors);
-      } catch (error) {
-        return 'Request gagal.';
-      }
-    }
-    return 'Request gagal.';
-  };
-
-  const setTabError = (tab, message) => {
-    setErrors((prev) => ({
-      ...prev,
-      [tab]: message,
-    }));
-  };
-
-  const setTabLoading = (tab, value) => {
-    setLoading((prev) => ({
-      ...prev,
-      [tab]: value,
-    }));
-  };
-
-  const fetchDeviceTypes = async () => {
-    const cached = readCache(CACHE_KEYS.deviceTypes);
-    if (cached?.length) {
-      setDeviceTypes(cached);
-      setTabError('device', '');
-      setTabLoading('device', false);
-      return;
-    }
-
-    setTabLoading('device', true);
-    setTabError('device', '');
-    try {
-      const res = await apiRequest('/device-type');
-      if (!res.ok || res.data?.success === false) {
-        throw new Error(getErrorMessage(res.data));
-      }
-      const payload = unwrapApiData(res.data);
-      const list = Array.isArray(payload) ? payload : [];
-      setDeviceTypes(list);
-      writeCache(CACHE_KEYS.deviceTypes, list);
-    } catch (error) {
-      setTabError('device', error.message || 'Gagal mengambil data.');
-    } finally {
-      setTabLoading('device', false);
-    }
-  };
-
-  const fetchDeviceModels = async () => {
-    const cached = readCache(CACHE_KEYS.deviceModels);
-    if (cached?.length) {
-      setDeviceModels(cached);
-      setTabError('model', '');
-      setTabLoading('model', false);
-      return;
-    }
-
-    setTabLoading('model', true);
-    setTabError('model', '');
-    try {
-      const res = await apiRequest('/device-model');
-      if (!res.ok || res.data?.success === false) {
-        throw new Error(getErrorMessage(res.data));
-      }
-      const payload = unwrapApiData(res.data);
-      const list = Array.isArray(payload) ? payload : [];
-      setDeviceModels(list);
-      writeCache(CACHE_KEYS.deviceModels, list);
-    } catch (error) {
-      setTabError('model', error.message || 'Gagal mengambil data.');
-    } finally {
-      setTabLoading('model', false);
-    }
-  };
-
-  const fetchServiceTypes = async () => {
-    const cached = readCache(CACHE_KEYS.serviceTypes);
-    if (cached?.length) {
-      setServiceTypes(cached);
-      setTabError('service', '');
-      setTabLoading('service', false);
-      return;
-    }
-
-    setTabLoading('service', true);
-    setTabError('service', '');
-    try {
-      const res = await apiRequest('/references/service-types');
-      if (!res.ok || res.data?.success === false) {
-        throw new Error(getErrorMessage(res.data));
-      }
-      const payload = unwrapApiData(res.data);
-      const list = Array.isArray(payload) ? payload : [];
-      setServiceTypes(list);
-      writeCache(CACHE_KEYS.serviceTypes, list);
-    } catch (error) {
-      setTabError('service', error.message || 'Gagal mengambil data.');
-    } finally {
-      setTabLoading('service', false);
-    }
+    setSearchParams(params);
   };
 
   useEffect(() => {
-    if (activeTab === 'device') {
-      if (deviceTypes.length === 0) {
-        fetchDeviceTypes();
-      }
-    }
-    if (activeTab === 'model') {
-      if (deviceModels.length === 0) {
-        fetchDeviceModels();
-      }
-      if (deviceTypes.length === 0) {
-        fetchDeviceTypes();
-      }
-    }
-    if (activeTab === 'service') {
-      if (serviceTypes.length === 0) {
-        fetchServiceTypes();
-      }
-    }
-  }, [activeTab, deviceModels.length, deviceTypes.length, serviceTypes.length]);
+    const loadOptions = async () => {
+      try {
+        const [typeRes, modelRes] = await Promise.all([
+          apiRequest('/device-type?per_page=200'),
+          apiRequest('/device-model?per_page=200'),
+        ]);
 
-  const openModal = (mode = 'create', item = null) => {
+        if (typeRes.ok && typeRes.data?.success !== false) {
+          const list = unwrapApiData(typeRes.data);
+          setDeviceTypeOptions(Array.isArray(list) ? list : []);
+        }
+
+        if (modelRes.ok && modelRes.data?.success !== false) {
+          const list = unwrapApiData(modelRes.data);
+          setDeviceModelOptions(Array.isArray(list) ? list : []);
+        }
+      } catch (err) {
+        // silently ignore option load failures
+      }
+    };
+    loadOptions();
+  }, []);
+
+  useEffect(() => {
+    const fetchTabData = async () => {
+      setLoading(true);
+      setErrors((prev) => ({ ...prev, [activeTab]: '' }));
+      try {
+        let res;
+        if (activeTab === 'device-type') {
+          const query = new URLSearchParams();
+          query.set('page', String(page));
+          query.set('per_page', String(perPage));
+          if (search) query.set('search', search);
+          res = await apiRequest(`/device-type?${query.toString()}`);
+          if (!res.ok || res.data?.success === false) {
+            throw new Error(parseApiError(res.data));
+          }
+          const list = unwrapApiData(res.data);
+          setDeviceTypes(Array.isArray(list) ? list : []);
+          setMetaMap((prev) => ({ ...prev, 'device-type': unwrapApiMeta(res.data) }));
+        }
+
+        if (activeTab === 'model') {
+          const query = new URLSearchParams();
+          query.set('page', String(page));
+          query.set('per_page', String(perPage));
+          if (search) query.set('keyword', search);
+          res = await apiRequest(`/device-model?${query.toString()}`);
+          if (!res.ok || res.data?.success === false) {
+            throw new Error(parseApiError(res.data));
+          }
+          const list = unwrapApiData(res.data);
+          setDeviceModels(Array.isArray(list) ? list : []);
+          setMetaMap((prev) => ({ ...prev, model: unwrapApiMeta(res.data) }));
+        }
+
+        if (activeTab === 'device') {
+          const query = new URLSearchParams();
+          query.set('page', String(page));
+          query.set('per_page', String(perPage));
+          if (search) query.set('serial-number', search);
+          res = await apiRequest(`/devices?${query.toString()}`);
+          if (!res.ok || res.data?.success === false) {
+            throw new Error(parseApiError(res.data));
+          }
+          const list = unwrapApiData(res.data);
+          setDevices(Array.isArray(list) ? list : []);
+          setMetaMap((prev) => ({ ...prev, device: unwrapApiMeta(res.data) }));
+        }
+
+        if (activeTab === 'vendor') {
+          const query = new URLSearchParams();
+          query.set('page', String(page));
+          query.set('per_page', String(perPage));
+          if (search) query.set('search', search);
+          res = await apiRequest(`/vendors?${query.toString()}`);
+          if (!res.ok || res.data?.success === false) {
+            throw new Error(parseApiError(res.data));
+          }
+          const list = unwrapApiData(res.data);
+          setVendors(Array.isArray(list) ? list : []);
+          setMetaMap((prev) => ({ ...prev, vendor: unwrapApiMeta(res.data) }));
+        }
+
+        if (activeTab === 'department') {
+          const query = new URLSearchParams();
+          query.set('page', String(page));
+          query.set('per_page', String(perPage));
+          if (search) query.set('search', search);
+          res = await apiRequest(`/departments?${query.toString()}`);
+          if (!res.ok || res.data?.success === false) {
+            throw new Error(parseApiError(res.data));
+          }
+          const list = unwrapApiData(res.data);
+          setDepartments(Array.isArray(list) ? list : []);
+          setMetaMap((prev) => ({ ...prev, department: unwrapApiMeta(res.data) }));
+        }
+
+        if (activeTab === 'service') {
+          res = await apiRequest('/references/service-types');
+          if (!res.ok || res.data?.success === false) {
+            throw new Error(parseApiError(res.data));
+          }
+          const list = unwrapApiData(res.data);
+          setServiceTypes(Array.isArray(list) ? list : []);
+          setMetaMap((prev) => ({ ...prev, service: null }));
+        }
+      } catch (err) {
+        setErrors((prev) => ({
+          ...prev,
+          [activeTab]: err.message || 'Gagal mengambil data.',
+        }));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTabData();
+  }, [activeTab, page, perPage, search, reloadToken]);
+
+  const deviceTypeMap = useMemo(() => {
+    return deviceTypeOptions.reduce((acc, item) => {
+      acc[item.id] = item.name;
+      return acc;
+    }, {});
+  }, [deviceTypeOptions]);
+
+  const deviceModelMap = useMemo(() => {
+    return deviceModelOptions.reduce((acc, item) => {
+      acc[item.id] = `${item.brand} ${item.model}`.trim();
+      return acc;
+    }, {});
+  }, [deviceModelOptions]);
+
+  const currentMeta = metaMap[activeTab];
+  const currentError = errors[activeTab];
+
+  const openModal = (tab, mode = 'create', item = null) => {
     setModalError('');
-    setModal(activeTab);
+    setModal(tab);
     setModalMode(mode);
     setEditingItem(item);
 
-    if (activeTab === 'device') {
-      setDeviceForm({ name: item?.name || '' });
+    if (tab === 'device-type') {
+      setDeviceTypeForm({ name: item?.name || '' });
     }
 
-    if (activeTab === 'model') {
-      setModelForm({
+    if (tab === 'model') {
+      setDeviceModelForm({
         device_type_id: item?.device_type_id || '',
         brand: item?.brand || '',
         model: item?.model || '',
       });
     }
 
-    if (activeTab === 'service') {
-      setServiceForm({ name: item?.name || '' });
+    if (tab === 'device') {
+      setDeviceForm({
+        device_model_id: item?.device_model_id || '',
+        serial_number: item?.serial_number || '',
+      });
+    }
+
+    if (tab === 'vendor') {
+      setVendorForm({
+        name: item?.name || '',
+        maps_url: item?.maps_url || '',
+        description: item?.description || '',
+      });
+    }
+
+    if (tab === 'department') {
+      setDepartmentForm({
+        name: item?.name || '',
+        code: item?.code || '',
+      });
     }
   };
 
@@ -265,202 +261,151 @@ const MasterData = () => {
     setModalError('');
   };
 
-  const handleCreateDeviceType = async () => {
-    const payload = { name: deviceForm.name.trim() };
-    if (!payload.name) {
-      setModalError('Nama perangkat wajib diisi.');
-      return;
-    }
-
-    const tempId = `temp-${Date.now()}`;
-    try {
-      const optimisticItem = { id: tempId, name: payload.name, __optimistic: true };
-      setDeviceTypes((prev) => [optimisticItem, ...prev]);
-      closeModal();
-
-      const res = await apiRequest('/device-type', {
-        method: 'POST',
-        body: payload,
-      });
-      if (!res.ok || res.data?.success === false) {
-        throw new Error(getErrorMessage(res.data));
-      }
-      const created = unwrapApiData(res.data);
-      if (created?.id) {
-        setDeviceTypes((prev) => {
-          const next = prev.map((item) => (item.id === tempId ? created : item));
-          writeCache(CACHE_KEYS.deviceTypes, next);
-          return next;
-        });
-      } else {
-        await fetchDeviceTypes();
-      }
-    } catch (error) {
-      setDeviceTypes((prev) => {
-        const next = prev.filter((item) => item.id !== tempId);
-        writeCache(CACHE_KEYS.deviceTypes, next);
-        return next;
-      });
-      setTabError('device', error.message || 'Gagal menyimpan perangkat.');
-    }
+  const refreshActiveTab = () => {
+    updateParams({ page: 1 });
+    setReloadToken((prev) => prev + 1);
   };
 
-  const handleUpdateDeviceType = async () => {
-    if (!editingItem) return;
-    const payload = { name: deviceForm.name.trim() };
-    if (!payload.name) {
-      setModalError('Nama perangkat wajib diisi.');
-      return;
-    }
+  const handleSubmit = async () => {
+    setModalError('');
     try {
-      const res = await apiRequest(`/device-type/${editingItem.id}`, {
-        method: 'PUT',
-        body: payload,
-      });
-      if (!res.ok || res.data?.success === false) {
-        throw new Error(getErrorMessage(res.data));
-      }
-      const updated = unwrapApiData(res.data) || payload;
-      setDeviceTypes((prev) => {
-        const next = prev.map((item) =>
-          item.id === editingItem.id ? { ...item, ...updated } : item
+      if (modal === 'device-type') {
+        const payload = { name: deviceTypeForm.name.trim() };
+        if (!payload.name) {
+          setModalError('Nama perangkat wajib diisi.');
+          return;
+        }
+        const res = await apiRequest(
+          modalMode === 'edit' ? `/device-type/${editingItem.id}` : '/device-type',
+          {
+            method: modalMode === 'edit' ? 'PUT' : 'POST',
+            body: payload,
+          }
         );
-        writeCache(CACHE_KEYS.deviceTypes, next);
-        return next;
-      });
-      closeModal();
-    } catch (error) {
-      setModalError(error.message || 'Gagal memperbarui perangkat.');
-    }
-  };
-
-  const handleDeleteDeviceType = async (item) => {
-    const confirmed = window.confirm(`Hapus perangkat "${item.name}"?`);
-    if (!confirmed) return;
-    const prevItems = deviceTypes;
-    setDeviceTypes((prev) => {
-      const next = prev.filter((entry) => entry.id !== item.id);
-      writeCache(CACHE_KEYS.deviceTypes, next);
-      return next;
-    });
-    try {
-      const res = await apiRequest(`/device-type/${item.id}`, { method: 'DELETE' });
-      if (!res.ok || res.data?.success === false) {
-        throw new Error(getErrorMessage(res.data));
+        if (!res.ok || res.data?.success === false) {
+          throw new Error(parseApiError(res.data));
+        }
       }
-    } catch (error) {
-      setDeviceTypes(prevItems);
-      writeCache(CACHE_KEYS.deviceTypes, prevItems);
-      setTabError('device', error.message || 'Gagal menghapus perangkat.');
-    }
-  };
 
-  const handleCreateDeviceModel = async () => {
-    const payload = {
-      device_type_id: Number(modelForm.device_type_id),
-      brand: modelForm.brand.trim(),
-      model: modelForm.model.trim(),
-    };
-
-    if (!payload.device_type_id || !payload.brand || !payload.model) {
-      setModalError('Perangkat, brand, dan model wajib diisi.');
-      return;
-    }
-
-    const tempId = `temp-${Date.now()}`;
-    try {
-      const optimisticItem = { ...payload, id: tempId, __optimistic: true };
-      setDeviceModels((prev) => [optimisticItem, ...prev]);
-      closeModal();
-
-      const res = await apiRequest('/device-model', {
-        method: 'POST',
-        body: payload,
-      });
-      if (!res.ok || res.data?.success === false) {
-        throw new Error(getErrorMessage(res.data));
-      }
-      const created = unwrapApiData(res.data);
-      if (created?.id) {
-        setDeviceModels((prev) => {
-          const next = prev.map((item) => (item.id === tempId ? created : item));
-          writeCache(CACHE_KEYS.deviceModels, next);
-          return next;
-        });
-      } else {
-        await fetchDeviceModels();
-      }
-    } catch (error) {
-      setDeviceModels((prev) => {
-        const next = prev.filter((item) => item.id !== tempId);
-        writeCache(CACHE_KEYS.deviceModels, next);
-        return next;
-      });
-      setTabError('model', error.message || 'Gagal menyimpan model.');
-    }
-  };
-
-  const handleUpdateDeviceModel = async () => {
-    if (!editingItem) return;
-    const payload = {
-      device_type_id: Number(modelForm.device_type_id),
-      brand: modelForm.brand.trim(),
-      model: modelForm.model.trim(),
-    };
-
-    if (!payload.device_type_id || !payload.brand || !payload.model) {
-      setModalError('Perangkat, brand, dan model wajib diisi.');
-      return;
-    }
-
-    try {
-      const res = await apiRequest(`/device-model/${editingItem.id}`, {
-        method: 'PUT',
-        body: payload,
-      });
-      if (!res.ok || res.data?.success === false) {
-        throw new Error(getErrorMessage(res.data));
-      }
-      const updated = unwrapApiData(res.data) || payload;
-      setDeviceModels((prev) => {
-        const next = prev.map((item) =>
-          item.id === editingItem.id ? { ...item, ...updated } : item
+      if (modal === 'model') {
+        const payload = {
+          device_type_id: Number(deviceModelForm.device_type_id),
+          brand: deviceModelForm.brand.trim(),
+          model: deviceModelForm.model.trim(),
+        };
+        if (!payload.device_type_id || !payload.brand || !payload.model) {
+          setModalError('Perangkat, brand, dan model wajib diisi.');
+          return;
+        }
+        const res = await apiRequest(
+          modalMode === 'edit' ? `/device-model/${editingItem.id}` : '/device-model',
+          {
+            method: modalMode === 'edit' ? 'PUT' : 'POST',
+            body: payload,
+          }
         );
-        writeCache(CACHE_KEYS.deviceModels, next);
-        return next;
-      });
-      closeModal();
-    } catch (error) {
-      setModalError(error.message || 'Gagal memperbarui model.');
-    }
-  };
-
-  const handleDeleteDeviceModel = async (item) => {
-    const confirmed = window.confirm(`Hapus model "${item.brand} ${item.model}"?`);
-    if (!confirmed) return;
-    const prevItems = deviceModels;
-    setDeviceModels((prev) => {
-      const next = prev.filter((entry) => entry.id !== item.id);
-      writeCache(CACHE_KEYS.deviceModels, next);
-      return next;
-    });
-    try {
-      const res = await apiRequest(`/device-model/${item.id}`, { method: 'DELETE' });
-      if (!res.ok || res.data?.success === false) {
-        throw new Error(getErrorMessage(res.data));
+        if (!res.ok || res.data?.success === false) {
+          throw new Error(parseApiError(res.data));
+        }
       }
-    } catch (error) {
-      setDeviceModels(prevItems);
-      writeCache(CACHE_KEYS.deviceModels, prevItems);
-      setTabError('model', error.message || 'Gagal menghapus model.');
+
+      if (modal === 'device') {
+        const payload = {
+          device_model_id: Number(deviceForm.device_model_id),
+          serial_number: deviceForm.serial_number.trim(),
+        };
+        if (!payload.device_model_id || !payload.serial_number) {
+          setModalError('Model dan serial number wajib diisi.');
+          return;
+        }
+        const res = await apiRequest(
+          modalMode === 'edit' ? `/devices/${editingItem.id}` : '/devices',
+          {
+            method: modalMode === 'edit' ? 'PUT' : 'POST',
+            body: payload,
+          }
+        );
+        if (!res.ok || res.data?.success === false) {
+          throw new Error(parseApiError(res.data));
+        }
+      }
+
+      if (modal === 'vendor') {
+        const payload = {
+          name: vendorForm.name.trim(),
+          maps_url: vendorForm.maps_url.trim(),
+          description: vendorForm.description.trim(),
+        };
+        if (!payload.name || !payload.maps_url || !payload.description) {
+          setModalError('Nama, maps url, dan deskripsi wajib diisi.');
+          return;
+        }
+        const res = await apiRequest(
+          modalMode === 'edit' ? `/vendors/${editingItem.id}` : '/vendors',
+          {
+            method: modalMode === 'edit' ? 'PUT' : 'POST',
+            body: payload,
+          }
+        );
+        if (!res.ok || res.data?.success === false) {
+          throw new Error(parseApiError(res.data));
+        }
+      }
+
+      if (modal === 'department') {
+        const payload = {
+          name: departmentForm.name.trim(),
+          code: departmentForm.code.trim(),
+        };
+        if (!payload.name || !payload.code) {
+          setModalError('Nama dan kode departemen wajib diisi.');
+          return;
+        }
+        const res = await apiRequest(
+          modalMode === 'edit' ? `/departments/${editingItem.id}` : '/departments',
+          {
+            method: modalMode === 'edit' ? 'PUT' : 'POST',
+            body: payload,
+          }
+        );
+        if (!res.ok || res.data?.success === false) {
+          throw new Error(parseApiError(res.data));
+        }
+      }
+
+      clearReferenceCache();
+      closeModal();
+      refreshActiveTab();
+    } catch (err) {
+      setModalError(err.message || 'Gagal menyimpan data.');
     }
   };
 
-  const handleServiceReadOnly = () => {
-    setModalError('Endpoint untuk tambah/edit service type belum tersedia di API.');
+  const handleDelete = async (tab, item) => {
+    const confirmed = window.confirm('Hapus data ini?');
+    if (!confirmed) return;
+    try {
+      let endpoint = '';
+      if (tab === 'device-type') endpoint = `/device-type/${item.id}`;
+      if (tab === 'model') endpoint = `/device-model/${item.id}`;
+      if (tab === 'device') endpoint = `/devices/${item.id}`;
+      if (tab === 'vendor') endpoint = `/vendors/${item.id}`;
+      if (tab === 'department') endpoint = `/departments/${item.id}`;
+      const res = await apiRequest(endpoint, { method: 'DELETE' });
+      if (!res.ok || res.data?.success === false) {
+        throw new Error(parseApiError(res.data));
+      }
+      clearReferenceCache();
+      refreshActiveTab();
+    } catch (err) {
+      setErrors((prev) => ({
+        ...prev,
+        [activeTab]: err.message || 'Gagal menghapus data.',
+      }));
+    }
   };
 
-  const renderStatusRow = (message) => (
+  const renderEmptyRow = (message) => (
     <div className="admin-master-row">
       <div className="admin-master-empty">{message}</div>
     </div>
@@ -472,91 +417,37 @@ const MasterData = () => {
 
       <section className="admin-master-card">
         <div className="admin-master-tabs">
-          <button
-            type="button"
-            className={`admin-master-tab ${
-              activeTab === 'device' ? 'active' : ''
-            }`}
-            onClick={() => setActiveTab('device')}
-          >
-            Perangkat
-          </button>
-          <button
-            type="button"
-            className={`admin-master-tab ${
-              activeTab === 'model' ? 'active' : ''
-            }`}
-            onClick={() => setActiveTab('model')}
-          >
-            Model
-          </button>
-          <button
-            type="button"
-            className={`admin-master-tab ${
-              activeTab === 'service' ? 'active' : ''
-            }`}
-            onClick={() => setActiveTab('service')}
-          >
-            Service
-          </button>
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={`admin-master-tab ${activeTab === tab.id ? 'active' : ''}`}
+              onClick={() => updateParams({ tab: tab.id, page: 1, search: '' })}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         <div className="admin-master-toolbar">
           <div>
             <div className="admin-master-title">
-              {activeTab === 'device' && 'Daftar Perangkat'}
-              {activeTab === 'model' && 'Daftar Model'}
-              {activeTab === 'service' && 'Daftar Jenis Service'}
+              {TABS.find((tab) => tab.id === activeTab)?.label}
             </div>
-            <div className="admin-master-subtitle">
-              API: {API_BASE_URL}
-            </div>
-            {errors[activeTab] && (
-              <div className="admin-master-error">{errors[activeTab]}</div>
+            {currentError && (
+              <div className="admin-master-error">{currentError}</div>
             )}
           </div>
 
           <div className="admin-master-actions">
-            {activeTab === 'model' && (
-              <>
-                <button className="admin-filter-btn" type="button">
-                  <i className="bi bi-funnel"></i>
-                  <span>Perangkat</span>
-                  <i className="bi bi-chevron-down"></i>
-                </button>
-                <button className="admin-filter-btn" type="button">
-                  <i className="bi bi-funnel"></i>
-                  <span>Merk</span>
-                  <i className="bi bi-chevron-down"></i>
-                </button>
-              </>
-            )}
-
-            {(activeTab === 'model' || activeTab === 'service') && (
+            {activeTab !== 'service' && (
               <div className="admin-search-box">
                 <input
                   type="text"
                   placeholder="Cari"
                   aria-label="Search"
-                  value={activeTab === 'model' ? modelSearch : serviceSearch}
-                  onChange={(event) =>
-                    activeTab === 'model'
-                      ? setModelSearch(event.target.value)
-                      : setServiceSearch(event.target.value)
-                  }
-                />
-                <i className="bi bi-search"></i>
-              </div>
-            )}
-
-            {activeTab === 'device' && (
-              <div className="admin-search-box">
-                <input
-                  type="text"
-                  placeholder="Cari"
-                  aria-label="Search"
-                  value={deviceSearch}
-                  onChange={(event) => setDeviceSearch(event.target.value)}
+                  value={search}
+                  onChange={(event) => updateParams({ search: event.target.value, page: 1 })}
                 />
                 <i className="bi bi-search"></i>
               </div>
@@ -565,7 +456,7 @@ const MasterData = () => {
             <button
               className="admin-master-add"
               type="button"
-              onClick={() => openModal('create')}
+              onClick={() => openModal(activeTab, 'create')}
               disabled={activeTab === 'service'}
               title={
                 activeTab === 'service'
@@ -579,31 +470,30 @@ const MasterData = () => {
         </div>
 
         <div className="admin-master-table">
-          {activeTab === 'device' && (
+          {activeTab === 'device-type' && (
             <>
               <div className="admin-master-row admin-master-head">
                 <div>Nama</div>
                 <div className="admin-master-action-col">Aksi</div>
               </div>
-              {loading.device && filteredDeviceTypes.length === 0 &&
-                renderStatusRow('Memuat data...')}
-              {!loading.device && !errors.device && filteredDeviceTypes.length === 0
-                ? renderStatusRow('Data kosong.')
-                : filteredDeviceTypes.map((row) => (
+              {loading && renderEmptyRow('Memuat data...')}
+              {!loading && !currentError && deviceTypes.length === 0
+                ? renderEmptyRow('Data kosong.')
+                : deviceTypes.map((row) => (
                     <div className="admin-master-row" key={row.id}>
                       <div>{row.name}</div>
                       <div className="admin-master-actions-cell">
                         <button
                           type="button"
                           className="admin-master-icon"
-                          onClick={() => openModal('edit', row)}
+                          onClick={() => openModal('device-type', 'edit', row)}
                         >
                           <i className="bi bi-pencil"></i>
                         </button>
                         <button
                           type="button"
                           className="admin-master-icon"
-                          onClick={() => handleDeleteDeviceType(row)}
+                          onClick={() => handleDelete('device-type', row)}
                         >
                           <i className="bi bi-trash"></i>
                         </button>
@@ -621,11 +511,10 @@ const MasterData = () => {
                 <div>Model</div>
                 <div className="admin-master-action-col">Aksi</div>
               </div>
-              {loading.model && filteredDeviceModels.length === 0 &&
-                renderStatusRow('Memuat data...')}
-              {!loading.model && !errors.model && filteredDeviceModels.length === 0
-                ? renderStatusRow('Data kosong.')
-                : filteredDeviceModels.map((row) => (
+              {loading && renderEmptyRow('Memuat data...')}
+              {!loading && !currentError && deviceModels.length === 0
+                ? renderEmptyRow('Data kosong.')
+                : deviceModels.map((row) => (
                     <div className="admin-master-row admin-master-model-row" key={row.id}>
                       <div>{deviceTypeMap[row.device_type_id] || '-'}</div>
                       <div>{row.brand}</div>
@@ -634,14 +523,119 @@ const MasterData = () => {
                         <button
                           type="button"
                           className="admin-master-icon"
-                          onClick={() => openModal('edit', row)}
+                          onClick={() => openModal('model', 'edit', row)}
                         >
                           <i className="bi bi-pencil"></i>
                         </button>
                         <button
                           type="button"
                           className="admin-master-icon"
-                          onClick={() => handleDeleteDeviceModel(row)}
+                          onClick={() => handleDelete('model', row)}
+                        >
+                          <i className="bi bi-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+            </>
+          )}
+
+          {activeTab === 'device' && (
+            <>
+              <div className="admin-master-row admin-master-head admin-master-model-head">
+                <div>Model</div>
+                <div>Serial Number</div>
+                <div className="admin-master-action-col">Aksi</div>
+              </div>
+              {loading && renderEmptyRow('Memuat data...')}
+              {!loading && !currentError && devices.length === 0
+                ? renderEmptyRow('Data kosong.')
+                : devices.map((row) => (
+                    <div className="admin-master-row admin-master-model-row" key={row.id}>
+                      <div>{row.device_model ? `${row.device_model.brand} ${row.device_model.model}` : deviceModelMap[row.device_model_id] || '-'}</div>
+                      <div>{row.serial_number}</div>
+                      <div className="admin-master-actions-cell">
+                        <button
+                          type="button"
+                          className="admin-master-icon"
+                          onClick={() => openModal('device', 'edit', row)}
+                        >
+                          <i className="bi bi-pencil"></i>
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-master-icon"
+                          onClick={() => handleDelete('device', row)}
+                        >
+                          <i className="bi bi-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+            </>
+          )}
+
+          {activeTab === 'vendor' && (
+            <>
+              <div className="admin-master-row admin-master-head admin-master-model-head">
+                <div>Nama</div>
+                <div>Maps URL</div>
+                <div className="admin-master-action-col">Aksi</div>
+              </div>
+              {loading && renderEmptyRow('Memuat data...')}
+              {!loading && !currentError && vendors.length === 0
+                ? renderEmptyRow('Data kosong.')
+                : vendors.map((row) => (
+                    <div className="admin-master-row admin-master-model-row" key={row.id}>
+                      <div>{row.name}</div>
+                      <div>{row.maps_url || '-'}</div>
+                      <div className="admin-master-actions-cell">
+                        <button
+                          type="button"
+                          className="admin-master-icon"
+                          onClick={() => openModal('vendor', 'edit', row)}
+                        >
+                          <i className="bi bi-pencil"></i>
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-master-icon"
+                          onClick={() => handleDelete('vendor', row)}
+                        >
+                          <i className="bi bi-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+            </>
+          )}
+
+          {activeTab === 'department' && (
+            <>
+              <div className="admin-master-row admin-master-head admin-master-model-head">
+                <div>Nama</div>
+                <div>Kode</div>
+                <div className="admin-master-action-col">Aksi</div>
+              </div>
+              {loading && renderEmptyRow('Memuat data...')}
+              {!loading && !currentError && departments.length === 0
+                ? renderEmptyRow('Data kosong.')
+                : departments.map((row) => (
+                    <div className="admin-master-row admin-master-model-row" key={row.id}>
+                      <div>{row.name}</div>
+                      <div>{row.code}</div>
+                      <div className="admin-master-actions-cell">
+                        <button
+                          type="button"
+                          className="admin-master-icon"
+                          onClick={() => openModal('department', 'edit', row)}
+                        >
+                          <i className="bi bi-pencil"></i>
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-master-icon"
+                          onClick={() => handleDelete('department', row)}
                         >
                           <i className="bi bi-trash"></i>
                         </button>
@@ -657,10 +651,10 @@ const MasterData = () => {
                 <div>Jenis Service</div>
                 <div className="admin-master-action-col">Aksi</div>
               </div>
-              {loading.service && filteredServiceTypes.length === 0 && renderStatusRow('Memuat data...')}
-              {!loading.service && !errors.service && filteredServiceTypes.length === 0
-                ? renderStatusRow('Data kosong.')
-                : filteredServiceTypes.map((row) => (
+              {loading && renderEmptyRow('Memuat data...')}
+              {!loading && !currentError && serviceTypes.length === 0
+                ? renderEmptyRow('Data kosong.')
+                : serviceTypes.map((row) => (
                     <div className="admin-master-row" key={row.id}>
                       <div>{row.name}</div>
                       <div className="admin-master-actions-cell">
@@ -684,30 +678,32 @@ const MasterData = () => {
             </>
           )}
         </div>
+
+        {currentMeta && (
+          <Pagination
+            meta={currentMeta}
+            onPageChange={(nextPage) => updateParams({ page: nextPage })}
+          />
+        )}
       </section>
 
-      <Modal isOpen={modal === 'device'} onClose={closeModal} className="admin-modal">
+      <Modal isOpen={modal === 'device-type'} onClose={closeModal} className="admin-modal">
         <button className="admin-modal-close" type="button" onClick={closeModal}>
           <i className="bi bi-x"></i>
         </button>
         <h2>{modalMode === 'edit' ? 'Edit Perangkat' : 'Tambah Perangkat'}</h2>
-        <p>Tambahkan perangkat ...</p>
         {modalError && <div className="admin-modal-error">{modalError}</div>}
         <div className="admin-modal-field">
           <label>Nama</label>
           <input
             type="text"
             placeholder="Masukkan nama perangkat"
-            value={deviceForm.name}
-            onChange={(event) => setDeviceForm({ name: event.target.value })}
+            value={deviceTypeForm.name}
+            onChange={(event) => setDeviceTypeForm({ name: event.target.value })}
           />
         </div>
         <div className="admin-modal-actions">
-          <button
-            className="admin-modal-save"
-            type="button"
-            onClick={modalMode === 'edit' ? handleUpdateDeviceType : handleCreateDeviceType}
-          >
+          <button className="admin-modal-save" type="button" onClick={handleSubmit}>
             Simpan
           </button>
         </div>
@@ -718,21 +714,20 @@ const MasterData = () => {
           <i className="bi bi-x"></i>
         </button>
         <h2>{modalMode === 'edit' ? 'Edit Model' : 'Tambah Model'}</h2>
-        <p>Tambahkan model ...</p>
         {modalError && <div className="admin-modal-error">{modalError}</div>}
         <div className="admin-modal-field">
           <label>Perangkat</label>
           <select
-            value={modelForm.device_type_id}
+            value={deviceModelForm.device_type_id}
             onChange={(event) =>
-              setModelForm((prev) => ({
+              setDeviceModelForm((prev) => ({
                 ...prev,
                 device_type_id: event.target.value,
               }))
             }
           >
             <option value="">Pilih</option>
-            {deviceTypes.map((deviceType) => (
+            {deviceTypeOptions.map((deviceType) => (
               <option key={deviceType.id} value={deviceType.id}>
                 {deviceType.name}
               </option>
@@ -744,9 +739,9 @@ const MasterData = () => {
           <input
             type="text"
             placeholder="Masukkan nama Merk"
-            value={modelForm.brand}
+            value={deviceModelForm.brand}
             onChange={(event) =>
-              setModelForm((prev) => ({
+              setDeviceModelForm((prev) => ({
                 ...prev,
                 brand: event.target.value,
               }))
@@ -758,9 +753,9 @@ const MasterData = () => {
           <input
             type="text"
             placeholder="Masukkan nama model"
-            value={modelForm.model}
+            value={deviceModelForm.model}
             onChange={(event) =>
-              setModelForm((prev) => ({
+              setDeviceModelForm((prev) => ({
                 ...prev,
                 model: event.target.value,
               }))
@@ -768,34 +763,123 @@ const MasterData = () => {
           />
         </div>
         <div className="admin-modal-actions">
-          <button
-            className="admin-modal-save"
-            type="button"
-            onClick={modalMode === 'edit' ? handleUpdateDeviceModel : handleCreateDeviceModel}
-          >
+          <button className="admin-modal-save" type="button" onClick={handleSubmit}>
             Simpan
           </button>
         </div>
       </Modal>
 
-      <Modal isOpen={modal === 'service'} onClose={closeModal} className="admin-modal">
+      <Modal isOpen={modal === 'device'} onClose={closeModal} className="admin-modal">
         <button className="admin-modal-close" type="button" onClick={closeModal}>
           <i className="bi bi-x"></i>
         </button>
-        <h2>Tambah Jenis Service</h2>
-        <p>Tambahkan jenis ...</p>
+        <h2>{modalMode === 'edit' ? 'Edit Device' : 'Tambah Device'}</h2>
         {modalError && <div className="admin-modal-error">{modalError}</div>}
         <div className="admin-modal-field">
-          <label>Jenis</label>
+          <label>Model</label>
+          <select
+            value={deviceForm.device_model_id}
+            onChange={(event) =>
+              setDeviceForm((prev) => ({
+                ...prev,
+                device_model_id: event.target.value,
+              }))
+            }
+          >
+            <option value="">Pilih</option>
+            {deviceModelOptions.map((model) => (
+              <option key={model.id} value={model.id}>
+                {model.brand} {model.model}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="admin-modal-field">
+          <label>Serial Number</label>
           <input
             type="text"
-            placeholder="Masukkan nama jenis servicenya"
-            value={serviceForm.name}
-            onChange={(event) => setServiceForm({ name: event.target.value })}
+            placeholder="Masukkan serial number"
+            value={deviceForm.serial_number}
+            onChange={(event) =>
+              setDeviceForm((prev) => ({
+                ...prev,
+                serial_number: event.target.value,
+              }))
+            }
           />
         </div>
         <div className="admin-modal-actions">
-          <button className="admin-modal-save" type="button" onClick={handleServiceReadOnly}>
+          <button className="admin-modal-save" type="button" onClick={handleSubmit}>
+            Simpan
+          </button>
+        </div>
+      </Modal>
+
+      <Modal isOpen={modal === 'vendor'} onClose={closeModal} className="admin-modal">
+        <button className="admin-modal-close" type="button" onClick={closeModal}>
+          <i className="bi bi-x"></i>
+        </button>
+        <h2>{modalMode === 'edit' ? 'Edit Vendor' : 'Tambah Vendor'}</h2>
+        {modalError && <div className="admin-modal-error">{modalError}</div>}
+        <div className="admin-modal-field">
+          <label>Nama</label>
+          <input
+            type="text"
+            placeholder="Masukkan nama vendor"
+            value={vendorForm.name}
+            onChange={(event) => setVendorForm((prev) => ({ ...prev, name: event.target.value }))}
+          />
+        </div>
+        <div className="admin-modal-field">
+          <label>Maps URL</label>
+          <input
+            type="text"
+            placeholder="Masukkan maps url"
+            value={vendorForm.maps_url}
+            onChange={(event) => setVendorForm((prev) => ({ ...prev, maps_url: event.target.value }))}
+          />
+        </div>
+        <div className="admin-modal-field">
+          <label>Deskripsi</label>
+          <textarea
+            rows={3}
+            value={vendorForm.description}
+            onChange={(event) => setVendorForm((prev) => ({ ...prev, description: event.target.value }))}
+          />
+        </div>
+        <div className="admin-modal-actions">
+          <button className="admin-modal-save" type="button" onClick={handleSubmit}>
+            Simpan
+          </button>
+        </div>
+      </Modal>
+
+      <Modal isOpen={modal === 'department'} onClose={closeModal} className="admin-modal">
+        <button className="admin-modal-close" type="button" onClick={closeModal}>
+          <i className="bi bi-x"></i>
+        </button>
+        <h2>{modalMode === 'edit' ? 'Edit Departemen' : 'Tambah Departemen'}</h2>
+        {modalError && <div className="admin-modal-error">{modalError}</div>}
+        <div className="admin-modal-field">
+          <label>Nama</label>
+          <input
+            type="text"
+            placeholder="Masukkan nama departemen"
+            value={departmentForm.name}
+            onChange={(event) => setDepartmentForm((prev) => ({ ...prev, name: event.target.value }))}
+          />
+        </div>
+        <div className="admin-modal-field">
+          <label>Kode</label>
+          <input
+            type="text"
+            placeholder="Masukkan kode departemen"
+            value={departmentForm.code}
+            onChange={(event) => setDepartmentForm((prev) => ({ ...prev, code: event.target.value }))}
+          />
+        </div>
+        <div className="admin-modal-actions">
+          <button className="admin-modal-save" type="button" onClick={handleSubmit}>
             Simpan
           </button>
         </div>

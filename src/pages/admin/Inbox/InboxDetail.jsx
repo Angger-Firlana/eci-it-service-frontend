@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import './InboxDetail.css';
 import backIcon from '../../../assets/icons/back.svg';
 import {
@@ -6,6 +7,7 @@ import {
   unwrapApiData,
   parseApiError,
   buildApiUrl,
+  clearRequestCache,
 } from '../../../lib/api';
 import {
   fetchDeviceModels,
@@ -17,6 +19,10 @@ import { getDeviceSummary, getPrimaryDetail } from '../../../lib/serviceRequestU
 import { getVendorApprovalEntityTypeId } from '../../../lib/statusHelpers';
 
 const AdminInboxDetail = ({ onBack, requestId }) => {
+  const params = useParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const resolvedRequestId = requestId || params.id;
   const [detail, setDetail] = useState(null);
   const [locations, setLocations] = useState([]);
   const [costs, setCosts] = useState([]);
@@ -48,18 +54,18 @@ const AdminInboxDetail = ({ onBack, requestId }) => {
   }, []);
 
   useEffect(() => {
-    if (!requestId) return;
+    if (!resolvedRequestId) return;
     const loadDetail = async () => {
       setLoading(true);
       setError('');
       try {
         const [detailRes, locationRes, costRes, approvalRes, transitionRes] =
           await Promise.all([
-            apiRequest(`/service-requests/${requestId}`),
-            apiRequest(`/service-requests/${requestId}/locations`),
-            apiRequest(`/service-requests/${requestId}/costs`),
-            apiRequest(`/service-requests/${requestId}/approvals`),
-            apiRequest(`/service-requests/${requestId}/allowed-transitions`),
+            apiRequest(`/service-requests/${resolvedRequestId}`),
+            apiRequest(`/service-requests/${resolvedRequestId}/locations`),
+            apiRequest(`/service-requests/${resolvedRequestId}/costs`),
+            apiRequest(`/service-requests/${resolvedRequestId}/approvals`),
+            apiRequest(`/service-requests/${resolvedRequestId}/allowed-transitions`),
           ]);
 
         if (!detailRes.ok || detailRes.data?.success === false) {
@@ -97,7 +103,7 @@ const AdminInboxDetail = ({ onBack, requestId }) => {
       }
     };
     loadDetail();
-  }, [requestId]);
+  }, [resolvedRequestId]);
 
   const statusMap = useMemo(() => {
     return statuses.reduce((acc, status) => {
@@ -201,9 +207,33 @@ const AdminInboxDetail = ({ onBack, requestId }) => {
 
       const updated = unwrapApiData(res.data);
       setDetail(updated || detail);
+      clearRequestCache('service-requests');
+
+      const transitionRes = await apiRequest(
+        `/service-requests/${detail.id}/allowed-transitions`
+      );
+      if (transitionRes.ok && transitionRes.data?.success !== false) {
+        const transitionPayload = unwrapApiData(transitionRes.data);
+        setAllowedTransitions(
+          Array.isArray(transitionPayload) ? transitionPayload : []
+        );
+      }
     } catch (err) {
       setActionError(err.message || 'Gagal memperbarui status.');
     }
+  };
+
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+    const from = searchParams.get('from');
+    if (from === 'inbox') {
+      navigate('/inbox');
+      return;
+    }
+    navigate('/service-requests');
   };
 
   return (
@@ -212,7 +242,7 @@ const AdminInboxDetail = ({ onBack, requestId }) => {
         <button
           className="admin-detail-back"
           type="button"
-          onClick={() => onBack?.()}
+          onClick={handleBack}
         >
           <img src={backIcon} alt="Back" />
         </button>

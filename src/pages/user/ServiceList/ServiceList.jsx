@@ -1,31 +1,55 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import './ServiceList.css';
 import eyeIcon from '../../../assets/icons/lihatdetail(eye).svg';
-import { apiRequest, unwrapApiData, parseApiError } from '../../../lib/api';
+import {
+  apiRequest,
+  unwrapApiData,
+  parseApiError,
+  unwrapApiMeta,
+} from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
-import { fetchDeviceModels, fetchDeviceTypes } from '../../../lib/referenceApi';
+import {
+  fetchDeviceModels,
+  fetchDeviceTypes,
+  fetchStatuses,
+} from '../../../lib/referenceApi';
 import { formatDate } from '../../../lib/formatters';
 import { getDeviceSummary, getPrimaryDetail } from '../../../lib/serviceRequestUtils';
+import { getServiceRequestEntityTypeId } from '../../../lib/statusHelpers';
 import { mapStatusVariant } from '../../../lib/statusHelpers';
+import { Pagination } from '../../../components/common';
+
+const DEFAULT_PER_PAGE = 10;
 
 const ServiceList = ({ onViewDetail }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [rows, setRows] = useState([]);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
+  const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [deviceModels, setDeviceModels] = useState([]);
   const [deviceTypes, setDeviceTypes] = useState([]);
+  const [statuses, setStatuses] = useState([]);
+
+  const page = Number(searchParams.get('page') || 1);
+  const perPage = Number(searchParams.get('per_page') || DEFAULT_PER_PAGE);
 
   useEffect(() => {
     const loadReferences = async () => {
       try {
-        const [models, types] = await Promise.all([
+        const [models, types, statusList] = await Promise.all([
           fetchDeviceModels(),
           fetchDeviceTypes(),
+          fetchStatuses(),
         ]);
         setDeviceModels(models);
         setDeviceTypes(types);
+        setStatuses(statusList);
       } catch (err) {
         setError(err.message || 'Gagal mengambil referensi perangkat.');
       }
@@ -34,20 +58,38 @@ const ServiceList = ({ onViewDetail }) => {
   }, []);
 
   useEffect(() => {
+    setSearch(searchParams.get('search') || '');
+    setStatusFilter(searchParams.get('status') || '');
+  }, [searchParams]);
+
+  useEffect(() => {
     const fetchRequests = async () => {
       if (!user?.id) return;
       setLoading(true);
       setError('');
       try {
-        const res = await apiRequest(
-          `/service-requests?user_id=${user.id}&per_page=50`
-        );
+        const query = new URLSearchParams();
+        query.set('user_id', String(user.id));
+        query.set('page', String(page));
+        query.set('per_page', String(perPage));
+        if (searchParams.get('search')) {
+          query.set('search', searchParams.get('search'));
+        }
+        if (statusFilter) {
+          query.set('status_id', statusFilter);
+        }
+
+        const res = await apiRequest(`/service-requests?${query.toString()}`, {
+          cacheKey: `service-requests:user:${user.id}:${page}:${perPage}:${searchParams.get('search') || ''}:${statusFilter}`,
+          staleTime: 60 * 1000,
+        });
         if (!res.ok || res.data?.success === false) {
           throw new Error(parseApiError(res.data, 'Gagal mengambil data.'));
         }
         const payload = unwrapApiData(res.data);
         const list = Array.isArray(payload) ? payload : [];
         setRows(list);
+        setMeta(unwrapApiMeta(res.data));
       } catch (err) {
         setError(err.message || 'Gagal mengambil data.');
       } finally {
@@ -55,7 +97,18 @@ const ServiceList = ({ onViewDetail }) => {
       }
     };
     fetchRequests();
-  }, [user]);
+  }, [page, perPage, searchParams, statusFilter, user]);
+
+  const serviceRequestEntityTypeId = useMemo(
+    () => getServiceRequestEntityTypeId(statuses),
+    [statuses]
+  );
+
+  const statusOptions = useMemo(() => {
+    return statuses.filter(
+      (status) => status.entity_type_id === serviceRequestEntityTypeId
+    );
+  }, [serviceRequestEntityTypeId, statuses]);
 
   const mappedRows = useMemo(() => {
     return rows.map((item) => {
@@ -98,6 +151,26 @@ const ServiceList = ({ onViewDetail }) => {
     });
   }, [mappedRows, search]);
 
+  const updateParams = (next) => {
+    const params = new URLSearchParams(searchParams);
+    Object.entries(next).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === '') {
+        params.delete(key);
+      } else {
+        params.set(key, String(value));
+      }
+    });
+    setSearchParams(params);
+  };
+
+  const handleViewDetail = (row) => {
+    if (onViewDetail) {
+      onViewDetail(row);
+      return;
+    }
+    navigate(`/service-requests/${row.id}?from=service-requests`);
+  };
+
   return (
     <div className="service-list-page">
       <div className="service-list-header">
@@ -111,7 +184,11 @@ const ServiceList = ({ onViewDetail }) => {
             placeholder=""
             aria-label="Search"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => {
+              const value = event.target.value;
+              setSearch(value);
+              updateParams({ search: value, page: 1 });
+            }}
           />
           <i className="bi bi-search"></i>
         </div>
@@ -122,11 +199,21 @@ const ServiceList = ({ onViewDetail }) => {
             <span>Date</span>
             <i className="bi bi-chevron-down"></i>
           </button>
-          <button className="filter-btn" type="button">
-            <i className="bi bi-funnel"></i>
-            <span>Status</span>
-            <i className="bi bi-chevron-down"></i>
-          </button>
+          <select
+            className="filter-select"
+            value={statusFilter}
+            onChange={(event) => {
+              setStatusFilter(event.target.value);
+              updateParams({ status: event.target.value, page: 1 });
+            }}
+          >
+            <option value="">Semua Status</option>
+            {statusOptions.map((status) => (
+              <option key={status.id} value={status.id}>
+                {status.name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -181,7 +268,7 @@ const ServiceList = ({ onViewDetail }) => {
                 <button
                   className="detail-btn"
                   type="button"
-                  onClick={() => onViewDetail?.(row)}
+                  onClick={() => handleViewDetail(row)}
                 >
                   <img src={eyeIcon} alt="Detail" />
                   Detail
@@ -190,6 +277,11 @@ const ServiceList = ({ onViewDetail }) => {
             </div>
           ))}
       </div>
+
+      <Pagination
+        meta={meta}
+        onPageChange={(nextPage) => updateParams({ page: nextPage })}
+      />
     </div>
   );
 };

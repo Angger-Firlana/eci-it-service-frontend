@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import './ServiceDetail.css';
 import backIcon from '../../../assets/icons/back.svg';
 import { apiRequest, unwrapApiData, parseApiError, buildApiUrl } from '../../../lib/api';
@@ -7,6 +8,10 @@ import { formatDateTime } from '../../../lib/formatters';
 import { getDeviceSummary, getPrimaryDetail } from '../../../lib/serviceRequestUtils';
 
 const ServiceDetail = ({ onBack, requestId }) => {
+  const params = useParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const resolvedRequestId = requestId || params.id;
   const [detail, setDetail] = useState(null);
   const [deviceModels, setDeviceModels] = useState([]);
   const [deviceTypes, setDeviceTypes] = useState([]);
@@ -33,12 +38,12 @@ const ServiceDetail = ({ onBack, requestId }) => {
   }, []);
 
   useEffect(() => {
-    if (!requestId) return;
+    if (!resolvedRequestId) return;
     const loadDetail = async () => {
       setLoading(true);
       setError('');
       try {
-        const res = await apiRequest(`/service-requests/${requestId}`);
+        const res = await apiRequest(`/service-requests/${resolvedRequestId}`);
         if (!res.ok || res.data?.success === false) {
           throw new Error(parseApiError(res.data, 'Gagal mengambil detail.'));
         }
@@ -51,7 +56,7 @@ const ServiceDetail = ({ onBack, requestId }) => {
       }
     };
     loadDetail();
-  }, [requestId]);
+  }, [resolvedRequestId]);
 
   const primaryDetail = getPrimaryDetail(detail);
   const deviceSummary = getDeviceSummary({
@@ -85,13 +90,26 @@ const ServiceDetail = ({ onBack, requestId }) => {
     });
   }, [detail, statusMap]);
 
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+    const from = searchParams.get('from');
+    if (from === 'inbox') {
+      navigate('/inbox');
+      return;
+    }
+    navigate('/service-requests');
+  };
+
   return (
     <div className="service-detail-page">
       <div className="detail-header">
         <button
           className="detail-back"
           type="button"
-          onClick={() => onBack?.()}
+          onClick={handleBack}
         >
           <img src={backIcon} alt="Back" />
         </button>

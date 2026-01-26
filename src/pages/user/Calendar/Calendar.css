@@ -151,6 +151,13 @@
   gap: 4px;
   font-size: 12px;
   background: #FAFAFA;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+
+.side-card:focus {
+  outline: none;
 }
 
 .side-title-row {

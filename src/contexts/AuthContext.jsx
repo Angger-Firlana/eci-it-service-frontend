@@ -6,7 +6,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { apiRequest, parseApiError } from '../lib/api';
+import { apiRequest, parseApiError, AUTH_LOGOUT_EVENT } from '../lib/api';
 import {
   clearAuthStorage,
   readAuthStorage,
@@ -64,9 +64,15 @@ export const AuthProvider = ({ children }) => {
           setUser(payload);
           persist(payload, stored.token);
         }
+      } else {
+        clearAuthStorage();
+        setUser(null);
+        setToken(null);
       }
     } catch (err) {
-      // Ignore refresh errors and keep stored data.
+      clearAuthStorage();
+      setUser(null);
+      setToken(null);
     } finally {
       setLoading(false);
     }
@@ -75,6 +81,23 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     hydrate();
   }, [hydrate]);
+
+  useEffect(() => {
+    const handleLogoutEvent = () => {
+      setUser(null);
+      setToken(null);
+      setError('');
+      clearAuthStorage();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener(AUTH_LOGOUT_EVENT, handleLogoutEvent);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener(AUTH_LOGOUT_EVENT, handleLogoutEvent);
+      }
+    };
+  }, []);
 
   const login = useCallback(async ({ email, password }) => {
     setError('');

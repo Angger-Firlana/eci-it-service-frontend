@@ -181,6 +181,16 @@
   resize: vertical;
 }
 
+.create-request .readonly-field {
+  border: 1px solid #C9C9C9;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-family: 'Poppins', sans-serif;
+  background: #f9fafb;
+  color: #6b6b6b;
+}
+
 .create-request .upload-box {
   border: 1px dashed #C9C9C9;
   border-radius: 10px;

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import './CreateRequest.css';
 import backIcon from '../../../assets/icons/back.svg';
 import nextIcon from '../../../assets/icons/next.svg';
-import { apiRequest, parseApiError } from '../../../lib/api';
+import { apiRequest, parseApiError, clearRequestCache } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
   fetchDeviceModels,
@@ -21,6 +21,8 @@ import { toISODate } from '../../../lib/formatters';
 
 const CreateRequest = () => {
   const { user } = useAuth();
+  const roleName = user?.role?.name || user?.role || 'user';
+  const isAdmin = roleName === 'admin';
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -65,10 +67,12 @@ const CreateRequest = () => {
         setDevices(deviceList);
         setServiceTypes(serviceList);
 
-        const adminRole = roles.find((role) => role.name === 'admin');
-        if (adminRole?.id) {
-          const adminList = await fetchUsers(`role_id=${adminRole.id}`);
-          setAdmins(adminList);
+        if (!isAdmin) {
+          const adminRole = roles.find((role) => role.name === 'admin');
+          if (adminRole?.id) {
+            const adminList = await fetchUsers(`role_id=${adminRole.id}`);
+            setAdmins(adminList);
+          }
         }
 
         const serviceRequestEntityTypeId =
@@ -87,7 +91,7 @@ const CreateRequest = () => {
     };
 
     loadReferences();
-  }, []);
+  }, [isAdmin]);
 
   const deviceTypeOptions = useMemo(() => deviceTypes, [deviceTypes]);
 
@@ -172,13 +176,13 @@ const CreateRequest = () => {
   }, [form.serviceTypeId, serviceTypes]);
 
   useEffect(() => {
-    if (!form.adminId && admins.length) {
+    if (!isAdmin && !form.adminId && admins.length) {
       setForm((prev) => ({
         ...prev,
         adminId: admins[0].id,
       }));
     }
-  }, [admins, form.adminId]);
+  }, [admins, form.adminId, isAdmin]);
 
   const handleDeviceSelect = (deviceTypeId) => {
     setForm((prev) => ({
@@ -219,7 +223,7 @@ const CreateRequest = () => {
       return;
     }
 
-    if (!form.adminId) {
+    if (!isAdmin && !form.adminId) {
       setSubmitError('Admin PIC wajib dipilih.');
       return;
     }
@@ -245,8 +249,12 @@ const CreateRequest = () => {
     }
 
     const formData = new FormData();
-    formData.append('user_id', String(user.id));
-    formData.append('admin_id', String(form.adminId));
+    if (!isAdmin) {
+      formData.append('user_id', String(user.id));
+      formData.append('admin_id', String(form.adminId));
+    } else {
+      formData.append('admin_id', String(user.id));
+    }
     formData.append('service_type_id', String(form.serviceTypeId));
     formData.append('status_id', String(pendingStatusId));
     formData.append('request_date', toISODate());
@@ -268,6 +276,7 @@ const CreateRequest = () => {
         throw new Error(parseApiError(res.data, 'Gagal mengirim request.'));
       }
 
+      clearRequestCache('service-requests');
       setSuccessMessage('Request berhasil dikirim.');
       setStep(1);
       setForm((prev) => ({
@@ -456,16 +465,25 @@ const CreateRequest = () => {
             </select>
           </div>
 
-          <div className="field">
-            <label>Admin PIC</label>
-            <select value={form.adminId} onChange={handleFieldChange('adminId')}>
-              {admins.map((admin) => (
-                <option key={admin.id} value={admin.id}>
-                  {admin.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {!isAdmin && (
+            <div className="field">
+              <label>Admin PIC</label>
+              <select value={form.adminId} onChange={handleFieldChange('adminId')}>
+                {admins.map((admin) => (
+                  <option key={admin.id} value={admin.id}>
+                    {admin.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {isAdmin && (
+            <div className="field">
+              <label>Admin PIC</label>
+              <div className="readonly-field">{user?.name || '-'}</div>
+            </div>
+          )}
 
           <div className="field">
             <label>Keterangan kerusakan</label>

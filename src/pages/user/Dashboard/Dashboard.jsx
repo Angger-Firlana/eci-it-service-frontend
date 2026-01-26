@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './Dashboard.css';
 import HeroSection from '../../../components/user/dashboard/HeroSection/HeroSection';
 import RequestList from '../../../components/user/dashboard/RequestList/RequestList';
@@ -8,6 +9,7 @@ import { formatDate } from '../../../lib/formatters';
 import { buildRequestTitle, getPrimaryDetail } from '../../../lib/serviceRequestUtils';
 
 const Dashboard = ({ user }) => {
+  const navigate = useNavigate();
   const [requests, setRequests] = useState([]);
   const [deviceModels, setDeviceModels] = useState([]);
   const [deviceTypes, setDeviceTypes] = useState([]);
@@ -68,23 +70,20 @@ const Dashboard = ({ user }) => {
   }, [deviceModels, deviceTypes, requests]);
 
   const handleViewAll = () => {
-    console.log('View all requests');
-    // TODO: Navigate to service list page
+    navigate('/service-requests');
   };
 
   const handleViewDetails = (request) => {
-    console.log('View details for:', request.title);
-    // TODO: Navigate to request detail page
+    if (!request?.id) return;
+    navigate(`/service-requests/${request.id}?from=service-requests`);
   };
 
   return (
     <div className="dashboard-container">
-      {/* Hero Section */}
       <HeroSection user={user} />
 
       {error && <div className="dashboard-error">{error}</div>}
 
-      {/* Recent Requests */}
       <RequestList
         requests={requestItems}
         onViewAll={handleViewAll}
