@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useEffect, useMemo } from 'react';
 import './App.css';
 import Layout from './layouts/Layout/Layout';
 import UserDashboard from './pages/user/Dashboard/Dashboard';
@@ -21,33 +22,44 @@ import AdminManageUsers from './pages/admin/ManageUsers/ManageUsers';
 import AdminMasterData from './pages/admin/MasterData/MasterData';
 import { ADMIN_MENU_ITEMS, ATASAN_MENU_ITEMS, USER_MENU_ITEMS } from './constants';
 import Login from './pages/auth/Login';
+import { useAuth } from './contexts/AuthContext';
+import { setUnauthorizedHandler } from './lib/api';
 
 function App() {
-  const [activeRoute, setActiveRoute] = useState('/create-request');
-  const [role, setRole] = useState(null);
-  const [detailVariant, setDetailVariant] = useState('progress');
-  const [adminInboxVariant, setAdminInboxVariant] = useState('approval');
+  const { isAuthenticated, user, logout } = useAuth();
+  const location = useLocation();
 
-  const user = useMemo(
-    () => ({
-      name: 'Toni Apalah',
-      email: 'Toni@gmail.com',
-      role: role ? role.charAt(0).toUpperCase() + role.slice(1) : 'User',
-      department: role === 'atasan' || role === 'admin' ? 'IT' : 'ECOMERS',
-    }),
-    [role]
-  );
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      logout();
+      window.location.href = '/login';
+    });
+  }, [logout]);
 
-  const sidebarRoute = useMemo(() => {
-    if (activeRoute.startsWith('/service-list')) {
+  const role = user?.role?.toLowerCase() || 'user';
+
+  const activeRoute = useMemo(() => {
+    const path = location.pathname;
+    if (path.startsWith('/services')) {
       return '/service-list';
     }
-    if (activeRoute.startsWith('/inbox')) {
+    if (path.startsWith('/inbox')) {
       return '/inbox';
     }
-
-    return activeRoute;
-  }, [activeRoute]);
+    if (path === '/create-request') {
+      return '/create-request';
+    }
+    if (path === '/calendar') {
+      return '/calendar';
+    }
+    if (path === '/manage-users') {
+      return '/manage-users';
+    }
+    if (path === '/master-data') {
+      return '/master-data';
+    }
+    return '/dashboard';
+  }, [location.pathname]);
 
   const menuItems = useMemo(() => {
     if (role === 'atasan') {
@@ -59,127 +71,68 @@ function App() {
     return USER_MENU_ITEMS;
   }, [role]);
 
-  const content = useMemo(() => {
-    if (role === 'admin') {
-      switch (activeRoute) {
-        case '/dashboard':
-          return <AdminDashboard user={user} />;
-        case '/create-request':
-          return <UserCreateRequest />;
-        case '/service-list':
-          return (
-            <AdminServiceList
-              onViewDetail={() => setActiveRoute('/service-list/detail')}
-            />
-          );
-        case '/service-list/detail':
-          return (
-            <AdminServiceDetail onBack={() => setActiveRoute('/service-list')} />
-          );
-        case '/inbox':
-          return (
-            <AdminInbox
-              onViewDetail={(row) => {
-                setAdminInboxVariant(row?.variant || 'approval');
-                setActiveRoute('/inbox/detail');
-              }}
-            />
-          );
-        case '/inbox/detail':
-          return (
-            <AdminInboxDetail
-              variant={adminInboxVariant}
-              onBack={() => setActiveRoute('/inbox')}
-            />
-          );
-        case '/calendar':
-          return <AdminCalendar />;
-        case '/manage-users':
-          return <AdminManageUsers />;
-        case '/master-data':
-          return <AdminMasterData />;
-        default:
-          return <AdminDashboard user={user} />;
-      }
-    }
-
-    if (role === 'atasan') {
-      switch (activeRoute) {
-        case '/dashboard':
-          return <AtasanDashboard user={user} />;
-        case '/service-list':
-          return (
-            <AtasanServiceList
-              onViewDetail={(row) => {
-                setDetailVariant(row?.detailVariant || 'progress');
-                setActiveRoute('/service-list/detail');
-              }}
-            />
-          );
-        case '/service-list/detail':
-          return (
-            <AtasanServiceDetail
-              variant={detailVariant}
-              onBack={() => setActiveRoute('/service-list')}
-            />
-          );
-        case '/calendar':
-          return <AtasanCalendar />;
-        case '/inbox':
-          return <AtasanInbox />;
-        default:
-          return <AtasanDashboard user={user} />;
-      }
-    }
-
-    switch (activeRoute) {
-      case '/dashboard':
-        return <UserDashboard user={user} />;
-      case '/create-request':
-        return <UserCreateRequest />;
-      case '/service-list':
-        return (
-          <UserServiceList
-            onViewDetail={() => setActiveRoute('/service-list/detail')}
-          />
-        );
-      case '/service-list/detail':
-        return (
-          <UserServiceDetail onBack={() => setActiveRoute('/service-list')} />
-        );
-      case '/calendar':
-        return <UserCalendar />;
-      default:
-        return <UserDashboard user={user} />;
-    }
-  }, [activeRoute, adminInboxVariant, detailVariant, role, user]);
-
-  if (!role) {
+  if (!isAuthenticated) {
     return (
-      <Login
-        onLogin={(selectedRole) => {
-          setRole(selectedRole);
-          setActiveRoute('/dashboard');
-        }}
-      />
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
     );
   }
 
   return (
     <Layout
-      activeRoute={sidebarRoute}
-      onNavigate={setActiveRoute}
+      activeRoute={activeRoute}
       user={user}
       menuItems={menuItems}
-      onLogout={() => {
-        setRole(null);
-        setActiveRoute('/create-request');
-        setDetailVariant('progress');
-        setAdminInboxVariant('approval');
-      }}
+      onLogout={logout}
       className={role === 'atasan' ? 'theme-atasan' : ''}
     >
-      {content}
+      <Routes>
+        <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+
+        {/* User Routes */}
+        {role === 'user' && (
+          <>
+            <Route path="/dashboard" element={<UserDashboard user={user} />} />
+            <Route path="/create-request" element={<UserCreateRequest />} />
+            <Route path="/services" element={<UserServiceList />} />
+            <Route path="/services/:id" element={<UserServiceDetail />} />
+            <Route path="/calendar" element={<UserCalendar />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </>
+        )}
+
+        {/* Atasan Routes */}
+        {role === 'atasan' && (
+          <>
+            <Route path="/dashboard" element={<AtasanDashboard user={user} />} />
+            <Route path="/services" element={<AtasanServiceList />} />
+            <Route path="/services/:id" element={<AtasanServiceDetail />} />
+            <Route path="/calendar" element={<AtasanCalendar />} />
+            <Route path="/inbox" element={<AtasanInbox />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </>
+        )}
+
+        {/* Admin Routes */}
+        {role === 'admin' && (
+          <>
+            <Route path="/dashboard" element={<AdminDashboard user={user} />} />
+            <Route path="/create-request" element={<UserCreateRequest />} />
+            <Route path="/services" element={<AdminServiceList />} />
+            <Route path="/services/:id" element={<AdminServiceDetail />} />
+            <Route path="/inbox" element={<AdminInbox />} />
+            <Route path="/inbox/:id" element={<AdminInboxDetail />} />
+            <Route path="/calendar" element={<AdminCalendar />} />
+            <Route path="/manage-users" element={<AdminManageUsers />} />
+            <Route path="/master-data" element={<AdminMasterData />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </>
+        )}
+
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
     </Layout>
   );
 }

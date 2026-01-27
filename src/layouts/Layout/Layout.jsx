@@ -6,7 +6,6 @@ import Topbar from '../Topbar';
 const Layout = ({
   children,
   activeRoute,
-  onNavigate,
   user,
   menuItems,
   onLogout,
@@ -19,7 +18,6 @@ const Layout = ({
     <div className={appClassName}>
       <Sidebar
         activeRoute={activeRoute}
-        onNavigate={onNavigate}
         isCollapsed={isSidebarCollapsed}
         onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         menuItems={menuItems}

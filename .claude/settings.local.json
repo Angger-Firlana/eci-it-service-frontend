@@ -4,7 +4,12 @@
       "Bash(tree:*)",
       "Bash(npm run dev:*)",
       "Bash(npm install:*)",
-      "Skill(frontend-design)"
+      "Skill(frontend-design)",
+      "Bash(ls:*)",
+      "Bash(npm run build:*)",
+      "Bash(curl:*)",
+      "Bash(php artisan:*)",
+      "Bash(python:*)"
     ]
   }
 }

@@ -1,70 +1,92 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './CreateRequest.css';
 import backIcon from '../../../assets/icons/back.svg';
 import nextIcon from '../../../assets/icons/next.svg';
-
-const DEVICE_OPTIONS = [
-  'Laptop',
-  'PC',
-  'Monitor',
-  'Printer',
-  'Scaner',
-  'UPS',
-  'Mikrotik',
-  'Switch',
-  'Proyektor',
-  '+',
-];
-
-const BRAND_OPTIONS = ['Lenovo', 'Apple', 'Asus', 'Lainnya'];
-
-const MODEL_OPTIONS = {
-  Lenovo: ['Lenovo V14', 'Lenovo V13', 'Thinkpad'],
-  Apple: ['MacBook Air', 'MacBook Pro'],
-  Asus: ['VivoBook', 'ROG', 'TUF'],
-  Lainnya: ['Lainnya'],
-};
-
-const SERVICE_OPTIONS = ['Hardware', 'Software', 'Network', 'Other'];
+import { authenticatedRequest } from '../../../lib/api';
 
 const CreateRequest = () => {
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [photoFile, setPhotoFile] = useState(null);
+
+  // Master data from API
+  const [deviceTypes, setDeviceTypes] = useState([]);
+  const [deviceModels, setDeviceModels] = useState([]);
+  const [serviceTypes, setServiceTypes] = useState([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+
   const [form, setForm] = useState({
-    deviceType: 'Laptop',
-    brand: 'Lenovo',
-    model: 'Lenovo V14',
-    serialNumber: 'KMBT123098MTCS',
-    serviceType: 'Hardware',
-    description: 'Keyboard nya rada rusak',
+    deviceTypeId: '',
+    deviceModelId: '',
+    serialNumber: '',
+    serviceTypeId: '',
+    complaint: '',
     photoName: '',
   });
 
-  const availableModels = useMemo(
-    () => MODEL_OPTIONS[form.brand] || MODEL_OPTIONS.Lainnya,
-    [form.brand]
-  );
+  // Fetch master data on mount
+  useEffect(() => {
+    const fetchMasterData = async () => {
+      setIsLoadingData(true);
+      try {
+        const [typesRes, modelsRes, serviceTypesRes] = await Promise.all([
+          authenticatedRequest('/device-type'),
+          authenticatedRequest('/device-model'),
+          authenticatedRequest('/references/service-types'),
+        ]);
 
-  const handleDeviceSelect = (device) => {
-    setForm((prev) => ({
-      ...prev,
-      deviceType: device === '+' ? 'Lainnya' : device,
-    }));
-  };
+        if (typesRes.ok) {
+          const types = typesRes.data.data || [];
+          setDeviceTypes(types);
+          if (types.length > 0) {
+            setForm(prev => ({ ...prev, deviceTypeId: types[0].id }));
+          }
+        }
 
-  const handleBrandChange = (event) => {
-    const brand = event.target.value;
-    const nextModel =
-      (MODEL_OPTIONS[brand] && MODEL_OPTIONS[brand][0]) || 'Lainnya';
+        if (modelsRes.ok) {
+          setDeviceModels(modelsRes.data.data || []);
+        }
 
-    setForm((prev) => ({
-      ...prev,
-      brand,
-      model: nextModel,
-    }));
+        if (serviceTypesRes.ok) {
+          const sTypes = serviceTypesRes.data.data || [];
+          setServiceTypes(sTypes);
+          if (sTypes.length > 0) {
+            setForm(prev => ({ ...prev, serviceTypeId: sTypes[0].id }));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load master data:', err);
+        setError('Failed to load form data. Please refresh the page.');
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    fetchMasterData();
+  }, []);
+
+  // Filter device models by selected device type
+  const filteredDeviceModels = useMemo(() => {
+    if (!form.deviceTypeId) return [];
+    return deviceModels.filter(model => model.device_type_id === parseInt(form.deviceTypeId));
+  }, [deviceModels, form.deviceTypeId]);
+
+  // Auto-select first model when device type changes
+  useEffect(() => {
+    if (filteredDeviceModels.length > 0 && !form.deviceModelId) {
+      setForm(prev => ({ ...prev, deviceModelId: filteredDeviceModels[0].id }));
+    }
+  }, [filteredDeviceModels, form.deviceModelId]);
+
+  const handleDeviceTypeSelect = (typeId) => {
+    setForm(prev => ({ ...prev, deviceTypeId: typeId, deviceModelId: '' }));
   };
 
   const handleFieldChange = (field) => (event) => {
-    setForm((prev) => ({
+    setForm(prev => ({
       ...prev,
       [field]: event.target.value,
     }));
@@ -72,28 +94,129 @@ const CreateRequest = () => {
 
   const handlePhotoChange = (event) => {
     const file = event.target.files?.[0];
-    setForm((prev) => ({
+    setPhotoFile(file || null);
+    setForm(prev => ({
       ...prev,
       photoName: file ? file.name : '',
     }));
   };
 
   const handleBack = () => {
-    setStep((prev) => Math.max(1, prev - 1));
+    setStep(prev => Math.max(1, prev - 1));
   };
 
-  const handlePrimary = () => {
+  const handlePrimary = async () => {
     if (step === 1) {
+      if (!form.serialNumber.trim()) {
+        setError('Serial Number is required');
+        return;
+      }
+      setError('');
       setStep(2);
       return;
     }
 
     if (step === 2) {
+      if (!form.complaint.trim()) {
+        setError('Complaint description is required');
+        return;
+      }
+      setError('');
       setStep(3);
       return;
     }
 
-    console.log('Submit request', form);
+    await handleSubmit();
+  };
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      // Step 1: Create Device
+      const deviceData = {
+        device_model_id: parseInt(form.deviceModelId),
+        serial_number: form.serialNumber,
+      };
+
+      console.log('Creating device with data:', deviceData);
+
+      const deviceResponse = await authenticatedRequest('/devices', {
+        method: 'POST',
+        body: deviceData, // Don't stringify - authenticatedRequest handles it
+      });
+
+      console.log('Device creation response:', deviceResponse);
+
+      if (!deviceResponse.ok) {
+        // Show detailed validation errors
+        let errorMsg = deviceResponse.data?.message || 'Failed to create device';
+        if (deviceResponse.data?.errors) {
+          const errors = deviceResponse.data.errors;
+          const errorList = Object.entries(errors).map(([field, msgs]) => {
+            return `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`;
+          });
+          errorMsg = errorList.join('\n');
+        }
+        throw new Error(errorMsg);
+      }
+
+      const deviceId = deviceResponse.data.data?.id || deviceResponse.data.id;
+
+      if (!deviceId) {
+        throw new Error('Device ID not returned from server');
+      }
+
+      // Step 2: Create Service Request
+      const formData = new FormData();
+
+      // Get user data for admin_id (for now, we'll use a default or get from auth)
+      const userResponse = await authenticatedRequest('/auth/me');
+      const userId = userResponse.data?.data?.id || userResponse.data?.id || 1;
+
+      formData.append('admin_id', '1'); // Default admin - adjust as needed
+      formData.append('user_id', userId);
+      formData.append('request_date', new Date().toISOString().split('T')[0]);
+      formData.append('status_id', '1'); // Pending status
+      formData.append('service_type_id', form.serviceTypeId);
+
+      // Details array
+      formData.append('details[0][device_id]', deviceId);
+      formData.append('details[0][complaint]', form.complaint);
+
+      if (photoFile) {
+        formData.append('details[0][complaint_images][0]', photoFile);
+      }
+
+      const serviceResponse = await authenticatedRequest('/service-requests', {
+        method: 'POST',
+        body: formData,
+      });
+
+      console.log('Service request response:', serviceResponse);
+
+      if (serviceResponse.ok) {
+        // Navigate to service list instead of detail (detail might not have all data yet)
+        navigate('/services');
+      } else {
+        // Show detailed validation errors
+        let errorMsg = serviceResponse.data?.message || 'Failed to create service request';
+        if (serviceResponse.data?.errors) {
+          const errors = serviceResponse.data.errors;
+          const errorList = Object.entries(errors).map(([field, msgs]) => {
+            return `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`;
+          });
+          errorMsg = errorList.join('\n');
+        }
+        throw new Error(errorMsg);
+      }
+    } catch (err) {
+      console.error('Submit error:', err);
+      setError(err.message || 'Failed to submit request. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const steps = [
@@ -101,6 +224,21 @@ const CreateRequest = () => {
     { id: 2, icon: 'bi-wrench-adjustable' },
     { id: 3, icon: 'bi-file-earmark-text' },
   ];
+
+  const selectedDeviceType = deviceTypes.find(t => t.id === parseInt(form.deviceTypeId));
+  const selectedDeviceModel = filteredDeviceModels.find(m => m.id === parseInt(form.deviceModelId));
+  const selectedServiceType = serviceTypes.find(s => s.id === parseInt(form.serviceTypeId));
+
+  if (isLoadingData) {
+    return (
+      <div className="create-request">
+        <div className="request-header">
+          <h1 className="request-title">Buat Request Service</h1>
+          <p className="request-subtitle">Loading form data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="create-request">
@@ -143,28 +281,22 @@ const CreateRequest = () => {
       {step === 1 && (
         <>
           <section className="request-card">
-            <div className="card-title">Pilih Perangkat</div>
+            <div className="card-title">Pilih Tipe Perangkat</div>
             <div className="card-subtitle">
-              Pilih perangkat yang akan di service
+              Pilih tipe perangkat yang akan di service
             </div>
 
             <div className="device-grid">
-              {DEVICE_OPTIONS.map((device) => {
-                const isAdd = device === '+';
-                const isActive =
-                  form.deviceType === device ||
-                  (isAdd && form.deviceType === 'Lainnya');
-
+              {deviceTypes.map((type) => {
+                const isActive = form.deviceTypeId === type.id;
                 return (
                   <button
-                    key={device}
+                    key={type.id}
                     type="button"
-                    className={`device-btn ${isActive ? 'active' : ''} ${
-                      isAdd ? 'device-add' : ''
-                    }`}
-                    onClick={() => handleDeviceSelect(device)}
+                    className={`device-btn ${isActive ? 'active' : ''}`}
+                    onClick={() => handleDeviceTypeSelect(type.id)}
                   >
-                    {device}
+                    {type.name}
                   </button>
                 );
               })}
@@ -172,27 +304,22 @@ const CreateRequest = () => {
           </section>
 
           <section className="request-card">
-            <div className="card-title">Brand/ Merk</div>
+            <div className="card-title">Model Perangkat</div>
             <div className="field">
-              <select value={form.brand} onChange={handleBrandChange}>
-                {BRAND_OPTIONS.map((brand) => (
-                  <option key={brand} value={brand}>
-                    {brand}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </section>
-
-          <section className="request-card">
-            <div className="card-title">Model</div>
-            <div className="field">
-              <select value={form.model} onChange={handleFieldChange('model')}>
-                {availableModels.map((model) => (
-                  <option key={model} value={model}>
-                    {model}
-                  </option>
-                ))}
+              <select
+                value={form.deviceModelId}
+                onChange={handleFieldChange('deviceModelId')}
+                disabled={filteredDeviceModels.length === 0}
+              >
+                {filteredDeviceModels.length === 0 ? (
+                  <option value="">No models available</option>
+                ) : (
+                  filteredDeviceModels.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.brand} - {model.model}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
           </section>
@@ -202,7 +329,7 @@ const CreateRequest = () => {
             <div className="field">
               <input
                 type="text"
-                placeholder="Serial number"
+                placeholder="Masukkan serial number perangkat"
                 value={form.serialNumber}
                 onChange={handleFieldChange('serialNumber')}
               />
@@ -219,12 +346,12 @@ const CreateRequest = () => {
           <div className="field">
             <label>Jenis Service</label>
             <select
-              value={form.serviceType}
-              onChange={handleFieldChange('serviceType')}
+              value={form.serviceTypeId}
+              onChange={handleFieldChange('serviceTypeId')}
             >
-              {SERVICE_OPTIONS.map((service) => (
-                <option key={service} value={service}>
-                  {service}
+              {serviceTypes.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name}
                 </option>
               ))}
             </select>
@@ -233,8 +360,9 @@ const CreateRequest = () => {
           <div className="field">
             <label>Keterangan kerusakan</label>
             <textarea
-              value={form.description}
-              onChange={handleFieldChange('description')}
+              value={form.complaint}
+              onChange={handleFieldChange('complaint')}
+              placeholder="Deskripsikan masalah perangkat Anda..."
             ></textarea>
           </div>
 
@@ -246,7 +374,7 @@ const CreateRequest = () => {
               {form.photoName && (
                 <span className="upload-name">{form.photoName}</span>
               )}
-              <input type="file" onChange={handlePhotoChange} />
+              <input type="file" accept="image/*" onChange={handlePhotoChange} />
             </label>
           </div>
         </section>
@@ -261,37 +389,35 @@ const CreateRequest = () => {
               <div className="confirm-photo-block">
                 <div className="confirm-label">Foto Perangkat</div>
                 <div className="confirm-photo">
-                  {form.photoName ? form.photoName : 'Foto Perangkat'}
+                  {form.photoName ? form.photoName : 'Tidak ada foto'}
                 </div>
               </div>
 
               <div className="confirm-rows">
                 <div className="confirm-row">
-                  <span className="confirm-key">Perangkat</span>
-                  <span className="confirm-value">{form.deviceType}</span>
-                </div>
-                <div className="confirm-row">
-                  <span className="confirm-key">Merk</span>
-                  <span className="confirm-value">{form.brand}</span>
+                  <span className="confirm-key">Tipe Perangkat</span>
+                  <span className="confirm-value">{selectedDeviceType?.name || '-'}</span>
                 </div>
                 <div className="confirm-row">
                   <span className="confirm-key">Model</span>
-                  <span className="confirm-value">{form.model}</span>
-                </div>
-                <div className="confirm-row">
-                  <span className="confirm-key">Jenis Service</span>
-                  <span className="confirm-value">{form.serviceType}</span>
+                  <span className="confirm-value">
+                    {selectedDeviceModel ? `${selectedDeviceModel.brand} - ${selectedDeviceModel.model}` : '-'}
+                  </span>
                 </div>
                 <div className="confirm-row">
                   <span className="confirm-key">Serial Number</span>
                   <span className="confirm-value">{form.serialNumber}</span>
+                </div>
+                <div className="confirm-row">
+                  <span className="confirm-key">Jenis Service</span>
+                  <span className="confirm-value">{selectedServiceType?.name || '-'}</span>
                 </div>
               </div>
             </div>
 
             <div className="confirm-notes">
               <div className="confirm-label">Keterangan</div>
-              <div className="confirm-text">{form.description}</div>
+              <div className="confirm-text">{form.complaint}</div>
             </div>
           </section>
 
@@ -307,19 +433,26 @@ const CreateRequest = () => {
         </div>
       )}
 
+      {error && <div className="request-error">{error}</div>}
+
       <div className="request-actions">
         <button
           type="button"
           className="btn-ghost"
           onClick={handleBack}
-          disabled={step === 1}
+          disabled={step === 1 || isSubmitting}
         >
           <img src={backIcon} alt="Back" />
           Back
         </button>
 
-        <button type="button" className="btn-primary" onClick={handlePrimary}>
-          {step === 1 ? 'Next' : 'Submit'}
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={handlePrimary}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? 'Submitting...' : step === 3 ? 'Submit' : 'Next'}
           <img src={nextIcon} alt="Next" />
         </button>
       </div>

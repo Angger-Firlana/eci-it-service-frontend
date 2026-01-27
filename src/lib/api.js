@@ -58,3 +58,28 @@ export const apiRequest = async (path, options = {}) => {
 
   return { ok: response.ok, status: response.status, data };
 };
+
+let onUnauthorizedCallback = null;
+
+export const setUnauthorizedHandler = (callback) => {
+  onUnauthorizedCallback = callback;
+};
+
+export const authenticatedRequest = async (path, options = {}) => {
+  const token = localStorage.getItem('auth_token');
+
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  const response = await apiRequest(path, { ...options, token });
+
+  if (response.status === 401) {
+    if (onUnauthorizedCallback) {
+      onUnauthorizedCallback();
+    }
+    throw new Error('Unauthorized');
+  }
+
+  return response;
+};

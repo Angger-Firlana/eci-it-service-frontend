@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import './Sidebar.css';
 import { USER_MENU_ITEMS } from '../../constants';
 import logoImg from '../../assets/images/logo-removebg-preview.png';
@@ -6,7 +7,6 @@ import sidebarIcon from '../../assets/icons/sidebar.svg';
 
 const Sidebar = ({
   activeRoute,
-  onNavigate,
   isCollapsed,
   onToggle,
   menuItems = USER_MENU_ITEMS,
@@ -65,17 +65,25 @@ const Sidebar = ({
           const isActive = activeRoute === item.route;
           const hasBadge = item.badge !== undefined && item.badge !== null;
 
+          const routeMap = {
+            '/service-list': '/services',
+            '/create-request': '/create-request',
+            '/calendar': '/calendar',
+            '/dashboard': '/dashboard',
+            '/inbox': '/inbox',
+            '/manage-users': '/manage-users',
+            '/master-data': '/master-data',
+          };
+
+          const linkTo = routeMap[item.route] || item.route;
+
           return (
-            <a
+            <Link
               key={item.id}
-              href="#"
+              to={linkTo}
               className={`nav-item ${isActive ? 'active' : ''} ${
                 isTablet || (isMobile && isCollapsed) ? 'nav-item-centered' : ''
               } ${hasBadge ? 'nav-item-badge' : ''}`}
-              onClick={(e) => {
-                e.preventDefault();
-                onNavigate(item.route);
-              }}
             >
               <img
                 src={isActive ? item.iconActive : item.icon}
@@ -84,7 +92,7 @@ const Sidebar = ({
               />
               {showLabel && <span className="nav-label">{item.label}</span>}
               {hasBadge && <span className="nav-badge">{item.badge}</span>}
-            </a>
+            </Link>
           );
         })}
       </nav>

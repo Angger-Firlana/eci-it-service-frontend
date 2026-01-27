@@ -4,3 +4,26 @@
   gap: 18px;
   padding-bottom: 24px;
 }
+
+.dashboard-loading,
+.dashboard-error {
+  background: #fff;
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+  color: #666;
+}
+
+.dashboard-error {
+  color: #c33;
+}
+
+.dashboard-error button {
+  margin-top: 12px;
+  background: #2f66ff;
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 24px;
+  cursor: pointer;
+}

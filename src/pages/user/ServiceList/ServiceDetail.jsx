@@ -1,58 +1,124 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import './ServiceDetail.css';
 import backIcon from '../../../assets/icons/back.svg';
+import { authenticatedRequest } from '../../../lib/api';
 
-const DETAIL_DATA = {
-  code: 'ABCD01',
-  createdAt: 'Dibuat pada tanggal 15 jan 2026 12:00',
-  department: 'Marketing',
-  requester: 'Toni Apalah',
-  device: 'Laptop',
-  brand: 'Lenovo',
-  model: 'Thinkpad Ideapad',
-  service: 'Hardware',
-  serialNumber: 'KMNT12390LOC',
-  description: 'Keyboard nya rada rusak',
-};
+const ServiceDetail = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
 
-const TIMELINE_ITEMS = [
-  {
-    id: 1,
-    label: 'Menunggu Approval',
-    date: '15 Jan 2026 12:00',
-    note: 'Request dibuat oleh Toni Apalah',
-    state: 'active',
-  },
-  {
-    id: 2,
-    label: 'Disetujui',
-    date: '17 Jan 2026 12:00',
-    note: 'Disetujui oleh admin dan akan di service di workshop',
-    state: 'active',
-  },
-  {
-    id: 3,
-    label: 'Selesai',
-    date: '17 Jan 2026 12:00',
-    note: 'Disetujui oleh admin dan akan di service di workshop',
-    state: 'active',
-  },
-];
+  const [detail, setDetail] = useState(null);
+  const [timeline, setTimeline] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-const ServiceDetail = ({ onBack }) => {
+  useEffect(() => {
+    const fetchServiceDetail = async () => {
+      if (!id) {
+        setError('Invalid service ID');
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const response = await authenticatedRequest(`/service-requests/${id}`);
+
+        if (response.ok && response.data) {
+          const serviceData = response.data.data || response.data;
+          console.log('Service detail data:', serviceData);
+          setDetail(serviceData);
+
+          // Timeline might come from different field
+          if (serviceData.timeline) {
+            setTimeline(serviceData.timeline);
+          } else if (serviceData.service_request_approvals) {
+            // Transform approvals to timeline format
+            const timelineFromApprovals = serviceData.service_request_approvals.map(approval => ({
+              id: approval.id,
+              label: approval.status?.name || 'Status Update',
+              status: approval.status?.name,
+              date: approval.created_at,
+              created_at: approval.created_at,
+              note: approval.remarks || '-',
+              description: approval.remarks || '-',
+              state: 'active'
+            }));
+            setTimeline(timelineFromApprovals);
+          }
+        } else if (response.status === 404) {
+          setError('Service request not found');
+        } else {
+          throw new Error('Failed to fetch service details');
+        }
+      } catch (err) {
+        console.error('Service detail fetch error:', err);
+        setError(err.message || 'Failed to load service details');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchServiceDetail();
+  }, [id]);
+
+  const formatDate = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+    return date.toLocaleDateString('id-ID', options);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="service-detail-page">
+        <div className="detail-loading">Loading service details...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="service-detail-page">
+        <div className="detail-error">
+          <p>{error}</p>
+          <button onClick={() => navigate('/services')}>Back to Service List</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!detail) {
+    return (
+      <div className="service-detail-page">
+        <div className="detail-error">
+          <p>Service request not found</p>
+          <button onClick={() => navigate('/services')}>Back to Service List</button>
+        </div>
+      </div>
+    );
+  }
+
+  // Get device info from service request details
+  const firstDetail = detail.service_request_details?.[0];
+  const deviceInfo = firstDetail?.device || {};
+
   return (
     <div className="service-detail-page">
       <div className="detail-header">
         <button
           className="detail-back"
           type="button"
-          onClick={() => onBack?.()}
+          onClick={() => navigate('/services')}
         >
           <img src={backIcon} alt="Back" />
         </button>
         <div className="detail-title">
-          <h1>{DETAIL_DATA.code}</h1>
-          <p>{DETAIL_DATA.createdAt}</p>
+          <h1>{detail.service_number || `SR-${detail.id}`}</h1>
+          <p>Dibuat pada tanggal {formatDate(detail.created_at)}</p>
         </div>
       </div>
 
@@ -60,62 +126,66 @@ const ServiceDetail = ({ onBack }) => {
         <section className="detail-card">
           <div className="detail-card-head">
             <h2>Detail Request</h2>
-            <span className="detail-dept">{DETAIL_DATA.department}</span>
+            <span className="detail-dept">{detail.user?.department || 'N/A'}</span>
           </div>
 
           <div className="detail-row">
             <span className="detail-key">Requester</span>
-            <span className="detail-value">{DETAIL_DATA.requester}</span>
+            <span className="detail-value">{detail.user?.name || '-'}</span>
           </div>
           <div className="detail-row">
-            <span className="detail-key">Perangkat</span>
-            <span className="detail-value">{DETAIL_DATA.device}</span>
+            <span className="detail-key">Service Number</span>
+            <span className="detail-value">{detail.service_number || '-'}</span>
           </div>
           <div className="detail-row">
-            <span className="detail-key">Merk</span>
-            <span className="detail-value">{DETAIL_DATA.brand}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-key">Model</span>
-            <span className="detail-value">{DETAIL_DATA.model}</span>
+            <span className="detail-key">Status</span>
+            <span className="detail-value">{detail.status?.name || '-'}</span>
           </div>
           <div className="detail-row">
             <span className="detail-key">Jenis Service</span>
-            <span className="detail-value">{DETAIL_DATA.service}</span>
+            <span className="detail-value">{detail.service_type?.name || '-'}</span>
           </div>
           <div className="detail-row">
             <span className="detail-key">Serial Number</span>
-            <span className="detail-value">{DETAIL_DATA.serialNumber}</span>
+            <span className="detail-value">{deviceInfo.serial_number || '-'}</span>
+          </div>
+          <div className="detail-row">
+            <span className="detail-key">Tanggal Request</span>
+            <span className="detail-value">{formatDate(detail.request_date)}</span>
           </div>
 
           <div className="detail-notes">
             <span className="detail-key">Keterangan</span>
-            <div className="detail-text">{DETAIL_DATA.description}</div>
+            <div className="detail-text">{firstDetail?.complaint || '-'}</div>
           </div>
         </section>
 
         <aside className="timeline-card">
           <h2>Timeline</h2>
 
-          <div className="timeline-list">
-            {TIMELINE_ITEMS.map((item, index) => (
-              <div className="timeline-item" key={item.id}>
-                <div className="timeline-marker">
-                  <span className={`timeline-dot ${item.state}`}></span>
-                  {index < TIMELINE_ITEMS.length - 1 && (
-                    <span className={`timeline-line ${item.state}`}></span>
-                  )}
+          {timeline.length > 0 ? (
+            <div className="timeline-list">
+              {timeline.map((item, index) => (
+                <div className="timeline-item" key={item.id || index}>
+                  <div className="timeline-marker">
+                    <span className={`timeline-dot ${item.state || 'active'}`}></span>
+                    {index < timeline.length - 1 && (
+                      <span className={`timeline-line ${item.state || 'active'}`}></span>
+                    )}
+                  </div>
+                  <div className="timeline-content">
+                    <span className={`timeline-tag ${item.state || 'active'}`}>
+                      {item.label || item.status}
+                    </span>
+                    <span className="timeline-date">{formatDate(item.date || item.created_at)}</span>
+                    <span className="timeline-desc">{item.note || item.description || '-'}</span>
+                  </div>
                 </div>
-                <div className="timeline-content">
-                  <span className={`timeline-tag ${item.state}`}>
-                    {item.label}
-                  </span>
-                  <span className="timeline-date">{item.date}</span>
-                  <span className="timeline-desc">{item.note}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="timeline-empty">No timeline available</div>
+          )}
 
           <button className="invoice-btn" type="button">
             Cetak Invoice
