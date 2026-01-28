@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import './ServiceDetail.css';
 import backIcon from '../../../assets/icons/back.svg';
 
@@ -101,9 +102,13 @@ const TIMELINE_VARIANTS = {
   ],
 };
 
-const ServiceDetail = ({ onBack, variant = 'progress' }) => {
-  const timelineItems = TIMELINE_VARIANTS[variant] || TIMELINE_VARIANTS.progress;
-  const showActions = variant === 'approval';
+const ServiceDetail = ({ onBack, variant = 'progress' } = {}) => {
+  const [searchParams] = useSearchParams();
+  const variantFromQuery = searchParams.get('variant');
+  const resolvedVariant = variantFromQuery || variant;
+  const timelineItems =
+    TIMELINE_VARIANTS[resolvedVariant] || TIMELINE_VARIANTS.progress;
+  const showActions = resolvedVariant === 'approval';
 
   return (
     <div className="atasan-detail-page">

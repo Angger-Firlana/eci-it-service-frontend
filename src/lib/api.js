@@ -31,9 +31,13 @@ export const unwrapApiData = (payload) => {
 };
 
 export const apiRequest = async (path, options = {}) => {
-  const { method = 'GET', body, token, headers } = options;
+  const { method = 'GET', body, token, headers, signal } = options;
   const requestHeaders = { ...(headers || {}) };
   const requestOptions = { method, headers: requestHeaders };
+
+  if (signal) {
+    requestOptions.signal = signal;
+  }
 
   if (token) {
     requestHeaders.Authorization = `Bearer ${token}`;

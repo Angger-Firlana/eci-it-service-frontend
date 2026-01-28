@@ -10,11 +10,16 @@ import { useServiceCache } from '../../../contexts/ServiceCacheContext';
 const transformServiceRequest = (request) => {
   const firstDetail = request.service_request_details?.[0];
   const deviceInfo = firstDetail?.device;
+  const deviceModel = deviceInfo?.device_model;
 
-  // Get device type/model info
-  let title = request.service_type?.name || 'Service Request';
+  let title = 'Service Request';
   if (deviceInfo) {
-    title = `Device SN: ${deviceInfo.serial_number}`;
+    const deviceTypeName =
+      deviceInfo.device_type?.name || deviceModel?.device_type?.name || '';
+    const brand = deviceModel?.brand || '';
+    const model = deviceModel?.model || '';
+    const modelLabel = [brand, model].filter(Boolean).join(' ');
+    title = [deviceTypeName, modelLabel].filter(Boolean).join(' ');
   }
 
   const formatDate = (dateString) => {
@@ -28,7 +33,7 @@ const transformServiceRequest = (request) => {
     title: title,
     description: firstDetail?.complaint || 'No description',
     status: request.status?.name || 'Pending',
-    date: formatDate(request.created_at),
+    date: formatDate(request.request_date || request.created_at),
     // Keep original data for detail view
     _original: request,
   };
@@ -39,43 +44,79 @@ const Dashboard = ({ user }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
-  const { updateCache } = useServiceCache();
+  const { serviceListCache, updateCache, isCacheValid } = useServiceCache();
 
   useEffect(() => {
+    const needsDetailFetch = (item) => {
+      const firstDetail = item.service_request_details?.[0];
+      return !firstDetail || !firstDetail.service_type;
+    };
+
+    const enrichServices = async (items) => {
+      const enriched = await Promise.all(
+        items.map(async (item) => {
+          if (!needsDetailFetch(item)) {
+            return item;
+          }
+
+          try {
+            const detailResponse = await authenticatedRequest(
+              `/service-requests/${item.id}`
+            );
+            if (detailResponse.ok && detailResponse.data) {
+              return detailResponse.data.data || detailResponse.data;
+            }
+          } catch (err) {
+            console.error('Dashboard detail fetch error:', err);
+          }
+
+          return item;
+        })
+      );
+
+      return enriched;
+    };
+
     const fetchRecentRequests = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
-        const response = await authenticatedRequest('/service-requests?limit=5&sort=created_at&order=desc');
+        if (isCacheValid() && Array.isArray(serviceListCache) && serviceListCache.length > 0) {
+          const enrichedCache = await enrichServices(serviceListCache);
+          setRequests(enrichedCache.slice(0, 5).map(transformServiceRequest));
+          if (enrichedCache.some(needsDetailFetch)) {
+            updateCache(enrichedCache);
+          }
+          setIsLoading(false);
+          return;
+        }
 
-        console.log('Dashboard response:', response);
+        const response = await authenticatedRequest(
+          '/service-requests?per_page=10&sort=created_at&order=desc'
+        );
 
         if (response.ok && response.data) {
           const data = response.data.data || response.data;
-          // Handle both array and paginated response
-          const rawServices = Array.isArray(data) ? data : [];
-          console.log('Dashboard raw services:', rawServices);
+          const rawServices = Array.isArray(data) ? data : data.data || [];
+          const enrichedServices = await enrichServices(rawServices);
 
-          // Transform to frontend format
-          const transformedServices = rawServices.map(transformServiceRequest);
-          console.log('Dashboard transformed services:', transformedServices);
-
-          setRequests(transformedServices);
+          updateCache(enrichedServices);
+          setRequests(enrichedServices.slice(0, 5).map(transformServiceRequest));
         } else {
           throw new Error('Failed to fetch requests');
         }
       } catch (err) {
         console.error('Dashboard fetch error:', err);
         setError(err.message || 'Failed to load requests');
-        setRequests([]); // Set empty array to prevent crashes
+        setRequests([]);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchRecentRequests();
-  }, [updateCache]);
+  }, [isCacheValid, serviceListCache, updateCache]);
 
   const handleViewAll = () => {
     navigate('/services');

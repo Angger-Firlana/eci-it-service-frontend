@@ -25,7 +25,7 @@ const INBOX_ROWS = [
   },
 ];
 
-const Inbox = ({ onViewDetail }) => {
+const Inbox = ({ onViewDetail } = {}) => {
   return (
     <div className="admin-inbox-page">
       <div className="admin-inbox-header">

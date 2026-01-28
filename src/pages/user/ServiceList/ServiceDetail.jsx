@@ -4,6 +4,9 @@ import './ServiceDetail.css';
 import backIcon from '../../../assets/icons/back.svg';
 import { authenticatedRequest } from '../../../lib/api';
 
+const serviceDetailCache = new Map();
+const SERVICE_DETAIL_CACHE_TTL_MS = 30_000;
+
 const ServiceDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -14,6 +17,20 @@ const ServiceDetail = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    const cacheKey = String(id || '');
+    const cached = serviceDetailCache.get(cacheKey);
+    const cachedStillValid =
+      cached && Date.now() - cached.cachedAt < SERVICE_DETAIL_CACHE_TTL_MS;
+
+    if (cachedStillValid) {
+      setDetail(cached.detail);
+      setTimeline(cached.timeline);
+      setIsLoading(false);
+      setError(null);
+    }
+
+    const controller = new AbortController();
+
     const fetchServiceDetail = async () => {
       if (!id) {
         setError('Invalid service ID');
@@ -21,23 +38,27 @@ const ServiceDetail = () => {
         return;
       }
 
-      setIsLoading(true);
+      if (!cachedStillValid) {
+        setIsLoading(true);
+      }
       setError(null);
 
       try {
-        const response = await authenticatedRequest(`/service-requests/${id}`);
+        const response = await authenticatedRequest(`/service-requests/${id}`, {
+          signal: controller.signal,
+        });
 
         if (response.ok && response.data) {
           const serviceData = response.data.data || response.data;
-          console.log('Service detail data:', serviceData);
           setDetail(serviceData);
 
           // Timeline might come from different field
+          let nextTimeline = [];
           if (serviceData.timeline) {
-            setTimeline(serviceData.timeline);
+            nextTimeline = serviceData.timeline;
           } else if (serviceData.service_request_approvals) {
             // Transform approvals to timeline format
-            const timelineFromApprovals = serviceData.service_request_approvals.map(approval => ({
+            nextTimeline = serviceData.service_request_approvals.map(approval => ({
               id: approval.id,
               label: approval.status?.name || 'Status Update',
               status: approval.status?.name,
@@ -47,22 +68,33 @@ const ServiceDetail = () => {
               description: approval.remarks || '-',
               state: 'active'
             }));
-            setTimeline(timelineFromApprovals);
           }
+
+          setTimeline(nextTimeline);
+          serviceDetailCache.set(cacheKey, {
+            detail: serviceData,
+            timeline: nextTimeline,
+            cachedAt: Date.now(),
+          });
         } else if (response.status === 404) {
           setError('Service request not found');
         } else {
           throw new Error('Failed to fetch service details');
         }
       } catch (err) {
+        if (err?.name === 'AbortError') return;
         console.error('Service detail fetch error:', err);
         setError(err.message || 'Failed to load service details');
       } finally {
-        setIsLoading(false);
+        if (!cachedStillValid) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchServiceDetail();
+
+    return () => controller.abort();
   }, [id]);
 
   const formatDate = (dateString) => {
@@ -105,6 +137,7 @@ const ServiceDetail = () => {
   // Get device info from service request details
   const firstDetail = detail.service_request_details?.[0];
   const deviceInfo = firstDetail?.device || {};
+  const deviceModel = deviceInfo.device_model || {};
 
   return (
     <div className="service-detail-page">
@@ -118,7 +151,7 @@ const ServiceDetail = () => {
         </button>
         <div className="detail-title">
           <h1>{detail.service_number || `SR-${detail.id}`}</h1>
-          <p>Dibuat pada tanggal {formatDate(detail.created_at)}</p>
+          <p>Dibuat pada tanggal {formatDate(detail.request_date || detail.created_at)}</p>
         </div>
       </div>
 
@@ -126,12 +159,38 @@ const ServiceDetail = () => {
         <section className="detail-card">
           <div className="detail-card-head">
             <h2>Detail Request</h2>
-            <span className="detail-dept">{detail.user?.department || 'N/A'}</span>
+            <span className="detail-dept">
+              {detail.user?.departments?.[0]?.name || 'N/A'}
+            </span>
           </div>
 
           <div className="detail-row">
             <span className="detail-key">Requester</span>
             <span className="detail-value">{detail.user?.name || '-'}</span>
+          </div>
+          <div className="detail-row">
+            <span className="detail-key">Perangkat</span>
+            <span className="detail-value">
+              {deviceInfo.device_type?.name || deviceModel.device_type?.name || '-'}
+            </span>
+          </div>
+          <div className="detail-row">
+            <span className="detail-key">Merk</span>
+            <span className="detail-value">{deviceModel.brand || '-'}</span>
+          </div>
+          <div className="detail-row">
+            <span className="detail-key">Model</span>
+            <span className="detail-value">{deviceModel.model || '-'}</span>
+          </div>
+          <div className="detail-row">
+            <span className="detail-key">Jenis Service</span>
+            <span className="detail-value">
+              {firstDetail?.service_type?.name || '-'}
+            </span>
+          </div>
+          <div className="detail-row">
+            <span className="detail-key">Serial Number</span>
+            <span className="detail-value">{deviceInfo.serial_number || '-'}</span>
           </div>
           <div className="detail-row">
             <span className="detail-key">Service Number</span>
@@ -140,18 +199,6 @@ const ServiceDetail = () => {
           <div className="detail-row">
             <span className="detail-key">Status</span>
             <span className="detail-value">{detail.status?.name || '-'}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-key">Jenis Service</span>
-            <span className="detail-value">{detail.service_type?.name || '-'}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-key">Serial Number</span>
-            <span className="detail-value">{deviceInfo.serial_number || '-'}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-key">Tanggal Request</span>
-            <span className="detail-value">{formatDate(detail.request_date)}</span>
           </div>
 
           <div className="detail-notes">
@@ -169,15 +216,19 @@ const ServiceDetail = () => {
                 <div className="timeline-item" key={item.id || index}>
                   <div className="timeline-marker">
                     <span className={`timeline-dot ${item.state || 'active'}`}></span>
-                    {index < timeline.length - 1 && (
-                      <span className={`timeline-line ${item.state || 'active'}`}></span>
-                    )}
+                    <span
+                      className={`timeline-connector ${item.state || 'active'} ${index === timeline.length - 1 ? 'tail' : ''}`}
+                    ></span>
                   </div>
                   <div className="timeline-content">
-                    <span className={`timeline-tag ${item.state || 'active'}`}>
-                      {item.label || item.status}
-                    </span>
-                    <span className="timeline-date">{formatDate(item.date || item.created_at)}</span>
+                    <div className="timeline-meta">
+                      <span className={`timeline-tag ${item.state || 'active'}`}>
+                        {item.label || item.status}
+                      </span>
+                      <span className="timeline-date">
+                        {formatDate(item.date || item.created_at)}
+                      </span>
+                    </div>
                     <span className="timeline-desc">{item.note || item.description || '-'}</span>
                   </div>
                 </div>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import './ServiceList.css';
 import eyeIcon from '../../../assets/icons/lihatdetail(eye).svg';
 
@@ -29,7 +30,17 @@ const SERVICE_ROWS = [
   },
 ];
 
-const ServiceList = ({ onViewDetail }) => {
+const ServiceList = ({ onViewDetail } = {}) => {
+  const navigate = useNavigate();
+
+  const handleViewDetail = (row) => {
+    if (onViewDetail) {
+      onViewDetail(row);
+      return;
+    }
+    const variantParam = row.detailVariant ? `?variant=${row.detailVariant}` : '';
+    navigate(`/services/${row.id}${variantParam}`);
+  };
   return (
     <div className="atasan-service-list">
       <div className="atasan-service-header">
@@ -98,7 +109,7 @@ const ServiceList = ({ onViewDetail }) => {
               <button
                 className="atasan-detail-btn"
                 type="button"
-                onClick={() => onViewDetail?.(row)}
+                onClick={() => handleViewDetail(row)}
               >
                 <img src={eyeIcon} alt="Detail" />
                 Detail

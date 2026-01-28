@@ -6,16 +6,52 @@ import { useServiceCache } from '../../../contexts/ServiceCacheContext';
 
 const Calendar = () => {
   const navigate = useNavigate();
-  const { serviceListCache, updateCache, isCacheValid } = useServiceCache();
+  const { calendarCache, updateCalendarCache, isCalendarCacheValid } = useServiceCache();
   const [services, setServices] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(null);
 
   useEffect(() => {
+    const needsDetailFetch = (item) => {
+      const firstDetail = item.service_request_details?.[0];
+      return !firstDetail || !firstDetail.service_type || !firstDetail.device;
+    };
+
+    const enrichServices = async (items) => {
+      const enriched = await Promise.all(
+        items.map(async (item) => {
+          if (!needsDetailFetch(item)) {
+            return item;
+          }
+
+          try {
+            const detailResponse = await authenticatedRequest(
+              `/service-requests/${item.id}`
+            );
+            if (detailResponse.ok && detailResponse.data) {
+              return detailResponse.data.data || detailResponse.data;
+            }
+          } catch (err) {
+            console.error('Calendar detail fetch error:', err);
+          }
+
+          return item;
+        })
+      );
+
+      return enriched;
+    };
+
     const fetchServices = async () => {
-      if (serviceListCache && isCacheValid()) {
-        setServices(serviceListCache);
+      if (calendarCache && isCalendarCacheValid()) {
+        setServices(calendarCache);
+        if (calendarCache.some(needsDetailFetch)) {
+          enrichServices(calendarCache).then((enriched) => {
+            setServices(enriched);
+            updateCalendarCache(enriched);
+          });
+        }
         return;
       }
 
@@ -25,8 +61,9 @@ const Calendar = () => {
         if (response.ok && response.data) {
           const data = response.data.data || response.data;
           const servicesData = Array.isArray(data) ? data : data.data || [];
-          setServices(servicesData);
-          updateCache(servicesData);
+          const enrichedServices = await enrichServices(servicesData);
+          setServices(enrichedServices);
+          updateCalendarCache(enrichedServices);
         }
       } catch (err) {
         console.error('Calendar fetch error:', err);
@@ -36,7 +73,7 @@ const Calendar = () => {
     };
 
     fetchServices();
-  }, [serviceListCache, updateCache, isCacheValid]);
+  }, [calendarCache, updateCalendarCache, isCalendarCacheValid]);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -45,15 +82,16 @@ const Calendar = () => {
     const events = {};
 
     services.forEach((service) => {
-      if (service.created_at) {
-        const date = new Date(service.created_at);
+      const createdDate = service.request_date || service.created_at;
+      if (createdDate) {
+        const date = new Date(createdDate);
         if (date.getFullYear() === year && date.getMonth() === month) {
           const day = date.getDate();
           if (!events[day]) events[day] = [];
           events[day].push({
             type: 'created',
             service,
-            date: service.created_at,
+            date: createdDate,
           });
         }
       }
@@ -111,6 +149,26 @@ const Calendar = () => {
 
   const selectedEvents = selectedDay ? eventsByDate[selectedDay] || [] : [];
 
+  const getServiceLabel = (service) => {
+    const detail = service.service_request_details?.[0];
+    const deviceModel = detail?.device?.device_model;
+    const deviceTypeName =
+      detail?.device?.device_type?.name ||
+      deviceModel?.device_type?.name ||
+      '';
+    const modelName = deviceModel
+      ? `${deviceModel.brand} ${deviceModel.model}`
+      : '';
+    const serviceName = detail?.service_type?.name || service.service_type?.name || '';
+
+    if (modelName && serviceName) {
+      return `${deviceTypeName ? `${deviceTypeName} ` : ''}${modelName} - ${serviceName}`;
+    }
+    return (
+      `${deviceTypeName ? `${deviceTypeName} ` : ''}${modelName || serviceName || ''}`
+    ).trim();
+  };
+
   return (
     <div className="calendar-page">
       <h1>Kalender</h1>
@@ -150,7 +208,7 @@ const Calendar = () => {
                   <div
                     key={`${day || 'empty'}-${index}`}
                     className={`calendar-day ${
-                      day === selectedDay ? 'selected' : ''
+                      day && day === selectedDay ? 'selected' : ''
                     } ${day ? '' : 'empty'} ${hasEvent ? 'has-event' : ''} ${
                       hasCreated ? 'event-created' : ''
                     } ${hasApproved ? 'event-approved' : ''}`}
@@ -195,9 +253,7 @@ const Calendar = () => {
                         {event.type === 'created' ? 'Created' : 'Approved'}
                       </span>
                     </div>
-                    <div className="side-sub">
-                      {event.service.service_type?.name || '-'}
-                    </div>
+                    <div className="side-sub">{getServiceLabel(event.service)}</div>
                     <div className="side-desc">
                       {event.service.service_request_details?.[0]?.complaint || ''}
                     </div>

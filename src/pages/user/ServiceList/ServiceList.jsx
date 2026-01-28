@@ -14,9 +14,39 @@ const ServiceList = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
-  const { updateCache } = useServiceCache();
+  const { serviceListCache, serviceListMeta, updateCache, isCacheValid } = useServiceCache();
 
   useEffect(() => {
+    const needsDetailFetch = (item) => {
+      const firstDetail = item.service_request_details?.[0];
+      return !firstDetail || !firstDetail.service_type;
+    };
+
+    const enrichServices = async (items) => {
+      const enriched = await Promise.all(
+        items.map(async (item) => {
+          if (!needsDetailFetch(item)) {
+            return item;
+          }
+
+          try {
+            const detailResponse = await authenticatedRequest(
+              `/service-requests/${item.id}`
+            );
+            if (detailResponse.ok && detailResponse.data) {
+              return detailResponse.data.data || detailResponse.data;
+            }
+          } catch (err) {
+            console.error('Service detail fetch error:', err);
+          }
+
+          return item;
+        })
+      );
+
+      return enriched;
+    };
+
     const fetchServices = async () => {
       setIsLoading(true);
       setError(null);
@@ -29,26 +59,24 @@ const ServiceList = () => {
         if (response.ok && response.data) {
           const data = response.data.data || response.data;
           const servicesData = Array.isArray(data) ? data : data.data || [];
+          const paginationData = data.pagination
+            ? data.pagination
+            : data.meta
+            ? {
+                current_page: data.meta.current_page,
+                last_page: data.meta.last_page,
+                total: data.meta.total,
+              }
+            : {
+                current_page: currentPage,
+                last_page: currentPage,
+                total: servicesData.length,
+              };
 
-          setServices(servicesData);
-
-          if (data.pagination) {
-            setPagination(data.pagination);
-          } else if (data.meta) {
-            setPagination({
-              current_page: data.meta.current_page,
-              last_page: data.meta.last_page,
-              total: data.meta.total,
-            });
-          } else {
-            setPagination({
-              current_page: currentPage,
-              last_page: currentPage,
-              total: servicesData.length,
-            });
-          }
-
-          updateCache(servicesData);
+          const enrichedServices = await enrichServices(servicesData);
+          setServices(enrichedServices);
+          setPagination(paginationData);
+          updateCache(enrichedServices, paginationData);
         } else {
           throw new Error('Failed to fetch services');
         }
@@ -60,8 +88,28 @@ const ServiceList = () => {
       }
     };
 
+    if (currentPage === 1 && isCacheValid() && Array.isArray(serviceListCache)) {
+      setServices(serviceListCache);
+      setPagination(
+        serviceListMeta || {
+          current_page: currentPage,
+          last_page: currentPage,
+          total: serviceListCache.length,
+        }
+      );
+      setIsLoading(false);
+
+      if (serviceListCache.some(needsDetailFetch)) {
+        enrichServices(serviceListCache).then((enrichedServices) => {
+          setServices(enrichedServices);
+          updateCache(enrichedServices, serviceListMeta);
+        });
+      }
+      return;
+    }
+
     fetchServices();
-  }, [currentPage, updateCache]);
+  }, [currentPage, isCacheValid, serviceListCache, serviceListMeta, updateCache]);
 
   const handlePageChange = (newPage) => {
     setSearchParams({ page: newPage.toString() });
@@ -84,8 +132,8 @@ const ServiceList = () => {
   // Get device info from service request details
   const getDeviceInfo = (row) => {
     const firstDetail = row.service_request_details?.[0];
-    return firstDetail?.device || {};
-  };
+              return firstDetail?.device || {};
+            };
 
   if (isLoading) {
     return (
@@ -163,10 +211,10 @@ const ServiceList = () => {
                 <div className="service-table-row" key={row.id}>
                   <div>{row.service_number || `SR-${row.id}`}</div>
                   <div>{deviceInfo.serial_number || '-'}</div>
-                  <div>{row.service_type?.name || '-'}</div>
+                  <div>{firstDetail?.service_type?.name || row.service_type?.name || '-'}</div>
                   <div>
                     <div className="date-pill">
-                      <span>{formatDate(row.created_at)}</span>
+                      <span>{formatDate(row.request_date || row.created_at)}</span>
                       <i className="bi bi-calendar3"></i>
                     </div>
                   </div>

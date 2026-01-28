@@ -12,6 +12,7 @@ import AtasanServiceList from './pages/atasan/ServiceList/ServiceList';
 import AtasanServiceDetail from './pages/atasan/ServiceList/ServiceDetail';
 import AtasanCalendar from './pages/atasan/Calendar/Calendar';
 import AtasanInbox from './pages/atasan/Inbox/Inbox';
+import AtasanInboxDetail from './pages/atasan/Inbox/InboxDetail';
 import AdminDashboard from './pages/admin/Dashboard/Dashboard';
 import AdminServiceList from './pages/admin/ServiceList/ServiceList';
 import AdminServiceDetail from './pages/admin/ServiceList/ServiceDetail';
@@ -111,6 +112,7 @@ function App() {
             <Route path="/services/:id" element={<AtasanServiceDetail />} />
             <Route path="/calendar" element={<AtasanCalendar />} />
             <Route path="/inbox" element={<AtasanInbox />} />
+            <Route path="/inbox/:id" element={<AtasanInboxDetail />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </>
         )}

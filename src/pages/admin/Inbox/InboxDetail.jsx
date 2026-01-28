@@ -393,7 +393,7 @@ const VARIANT_CONFIG = {
   },
 };
 
-const AdminInboxDetail = ({ onBack, variant = 'approval' }) => {
+const AdminInboxDetail = ({ onBack, variant = 'approval' } = {}) => {
   const [locationType, setLocationType] = useState('workshop');
   const [isLocationModalOpen, setLocationModalOpen] = useState(false);
   const [isMoveModalOpen, setMoveModalOpen] = useState(false);

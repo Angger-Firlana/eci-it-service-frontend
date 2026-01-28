@@ -66,7 +66,7 @@ const SERVICE_ROWS = [
   },
 ];
 
-const ServiceList = ({ onViewDetail }) => {
+const ServiceList = ({ onViewDetail } = {}) => {
   const navigate = useNavigate();
 
   const handleViewDetail = (row) => {

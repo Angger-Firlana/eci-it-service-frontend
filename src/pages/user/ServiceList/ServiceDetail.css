@@ -128,44 +128,65 @@
 .timeline-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 0;
 }
 
 .timeline-item {
   display: flex;
   gap: 12px;
+  align-items: stretch;
 }
 
 .timeline-marker {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-top: 2px;
+  flex-shrink: 0;
+  width: 12px;
 }
 
 .timeline-dot {
   width: 12px;
   height: 12px;
   border-radius: 999px;
-  background: #C9C9C9;
+  background-color: #C9C9C9;
+  flex-shrink: 0;
 }
 
-.timeline-line {
+.timeline-connector {
   width: 2px;
   flex: 1;
-  background: #C9C9C9;
+  min-height: 30px;
+  background-color: #C9C9C9;
   margin-top: 4px;
+  display: block;
 }
 
 .timeline-dot.active,
-.timeline-line.active {
-  background: var(--blue);
+.timeline-connector.active {
+  background-color: var(--blue);
+}
+
+.timeline-connector.tail {
+  flex: 0 0 28px;
 }
 
 .timeline-content {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding-bottom: 20px;
+}
+
+.timeline-item:last-child .timeline-content {
+  padding-bottom: 8px;
+}
+
+.timeline-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .timeline-tag {

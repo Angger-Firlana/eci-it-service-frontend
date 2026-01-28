@@ -1,5 +1,17 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
+/**
+ * @typedef {Object} AuthContextValue
+ * @property {string | null} token
+ * @property {any} user
+ * @property {boolean} isAuthenticated
+ * @property {boolean} isLoading
+ * @property {(value: boolean) => void} setIsLoading
+ * @property {(authToken: string, userData: any) => void} login
+ * @property {() => void} logout
+ */
+
+/** @type {import('react').Context<AuthContextValue | null>} */
 const AuthContext = createContext(null);
 
 const TOKEN_KEY = 'auth_token';
@@ -42,6 +54,7 @@ export const AuthProvider = ({ children }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
+/** @returns {AuthContextValue} */
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
