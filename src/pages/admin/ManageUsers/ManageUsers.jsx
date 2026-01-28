@@ -55,12 +55,25 @@ const ManageUsers = () => {
     return 'Request gagal.';
   };
 
-  const getRoleIdForTab = (tab) => {
-    const target = tab === 'atasan' ? 'atasan' : 'user';
-    const found = roles.find(
-      (r) => String(r.name || '').toLowerCase() === target
-    );
-    return found?.id || '';
+  const getRoleIdsForTab = (tab) => {
+    const byName = (name) =>
+      roles.find((r) => String(r.name || '').toLowerCase() === name)?.id;
+
+    if (tab === 'admin') {
+      // admin and technician are considered admin
+      return ['admin', 'technician'].map(byName).filter(Boolean);
+    }
+
+    if (tab === 'atasan') {
+      // supervisor and above are considered atasan
+      return ['supervisor', 'manager', 'director', 'ceo']
+        .map(byName)
+        .filter(Boolean);
+    }
+
+    // regular user tab
+    const userId = byName('user');
+    return userId ? [userId] : [];
   };
 
   useEffect(() => {
@@ -97,7 +110,7 @@ const ManageUsers = () => {
   }, []);
 
   useEffect(() => {
-    const roleId = getRoleIdForTab(activeTab);
+    const roleId = getRoleIdsForTab(activeTab)[0] || '';
     const defaultDepartmentId = departments[0]?.id ? String(departments[0].id) : '';
     setCreateForm((prev) => ({
       ...prev,
@@ -107,29 +120,51 @@ const ManageUsers = () => {
   }, [activeTab, departments, roles]);
 
   useEffect(() => {
-    const roleId = getRoleIdForTab(activeTab);
-    if (!roleId) return;
+    const roleIds = getRoleIdsForTab(activeTab);
+    if (!roleIds.length) return;
 
     const fetchUsers = async () => {
       setIsLoading(true);
       setError('');
       try {
-        const params = new URLSearchParams();
-        params.set('per_page', '50');
-        params.set('role_id', String(roleId));
-        if (search.trim()) params.set('search', search.trim());
-        if (departmentId) params.set('department_id', String(departmentId));
+        const buildParams = (rid) => {
+          const params = new URLSearchParams();
+          params.set('per_page', '50');
+          params.set('role_id', String(rid));
+          if (search.trim()) params.set('search', search.trim());
+          if (departmentId) params.set('department_id', String(departmentId));
+          return params;
+        };
 
-        const res = await authenticatedRequest(`/users?${params.toString()}`);
-        if (!res.ok || res.data?.success === false) {
-          throw new Error(getErrorMessage(res.data));
+        const requests = roleIds.map((rid) =>
+          authenticatedRequest(`/users?${buildParams(rid).toString()}`)
+        );
+        const responses = await Promise.all(requests);
+
+        const list = [];
+        const seen = new Set();
+        let total = 0;
+
+        for (const res of responses) {
+          if (!res.ok || res.data?.success === false) {
+            throw new Error(getErrorMessage(res.data));
+          }
+          const items = Array.isArray(unwrapApiData(res.data))
+            ? unwrapApiData(res.data)
+            : [];
+          for (const item of items) {
+            if (!item?.id || seen.has(item.id)) continue;
+            seen.add(item.id);
+            list.push(item);
+          }
+          total += Number(res.data?.meta?.total || items.length || 0);
         }
 
-        const list = Array.isArray(unwrapApiData(res.data))
-          ? unwrapApiData(res.data)
-          : [];
+        // Stable-ish ordering so the table doesn't jump around.
+        list.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+
         setUsers(list);
-        setMeta(res.data?.meta || null);
+        setMeta({ total: total || list.length });
 
         setSelectedId((prev) => {
           if (prev && list.some((u) => u.id === prev)) return prev;
@@ -164,7 +199,9 @@ const ManageUsers = () => {
       name: selectedRow.name || '',
       email: selectedRow.email || '',
       password: '',
-      role_id: String(selectedRow.roles?.[0]?.id || getRoleIdForTab(activeTab) || ''),
+      role_id: String(
+        selectedRow.roles?.[0]?.id || getRoleIdsForTab(activeTab)[0] || ''
+      ),
       department_id: String(selectedRow.departments?.[0]?.id || ''),
     });
   }, [activeTab, selectedRow]);
@@ -271,7 +308,7 @@ const ManageUsers = () => {
       name: '',
       email: '',
       password: '',
-      role_id: String(getRoleIdForTab(activeTab) || prev.role_id || ''),
+      role_id: String(getRoleIdsForTab(activeTab)[0] || prev.role_id || ''),
       department_id: String(departments[0]?.id || prev.department_id || ''),
     }));
   };
@@ -346,6 +383,15 @@ const ManageUsers = () => {
             </button>
             <button
               className={`admin-users-tab ${
+                activeTab === 'admin' ? 'active' : ''
+              }`}
+              type="button"
+              onClick={() => setActiveTab('admin')}
+            >
+              Admin
+            </button>
+            <button
+              className={`admin-users-tab ${
                 activeTab === 'atasan' ? 'active' : ''
               }`}
               type="button"
@@ -358,7 +404,8 @@ const ManageUsers = () => {
           <div className="admin-users-toolbar">
             <div className="admin-users-count">
               <i className="bi bi-people"></i>
-              {meta?.total ?? users.length} {activeTab === 'user' ? 'User' : 'Atasan'}
+              {meta?.total ?? users.length}{' '}
+              {activeTab === 'user' ? 'User' : activeTab === 'admin' ? 'Admin' : 'Atasan'}
             </div>
 
             <div className="admin-users-controls">

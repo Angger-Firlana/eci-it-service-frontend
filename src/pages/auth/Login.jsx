@@ -58,8 +58,11 @@ const Login = () => {
 
         const normalizeRole = (value) => {
           const v = String(value || '').toLowerCase();
-          if (v.includes('admin')) return 'admin';
-          if (v.includes('atasan') || v.includes('supervisor') || v.includes('manager')) {
+
+          // Backend roles table contains: admin, user, technician, supervisor, manager, director, ceo
+          // Frontend groups them into 3 buckets: admin / atasan / user
+          if (v === 'admin' || v === 'technician') return 'admin';
+          if (v === 'supervisor' || v === 'manager' || v === 'director' || v === 'ceo') {
             return 'atasan';
           }
           return 'user';
