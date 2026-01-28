@@ -15,8 +15,11 @@ const ServiceDetail = () => {
   const [timeline, setTimeline] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [hasResolved, setHasResolved] = useState(false);
 
   useEffect(() => {
+    setHasResolved(false);
+
     const cacheKey = String(id || '');
     const cached = serviceDetailCache.get(cacheKey);
     const cachedStillValid =
@@ -25,8 +28,9 @@ const ServiceDetail = () => {
     if (cachedStillValid) {
       setDetail(cached.detail);
       setTimeline(cached.timeline);
-      setIsLoading(false);
       setError(null);
+      setIsLoading(false);
+      setHasResolved(true);
     }
 
     const controller = new AbortController();
@@ -76,8 +80,11 @@ const ServiceDetail = () => {
             timeline: nextTimeline,
             cachedAt: Date.now(),
           });
+
+          setHasResolved(true);
         } else if (response.status === 404) {
           setError('Service request not found');
+          setHasResolved(true);
         } else {
           throw new Error('Failed to fetch service details');
         }
@@ -85,6 +92,7 @@ const ServiceDetail = () => {
         if (err?.name === 'AbortError') return;
         console.error('Service detail fetch error:', err);
         setError(err.message || 'Failed to load service details');
+        setHasResolved(true);
       } finally {
         if (!cachedStillValid) {
           setIsLoading(false);
@@ -124,6 +132,14 @@ const ServiceDetail = () => {
   }
 
   if (!detail) {
+    if (!hasResolved) {
+      return (
+        <div className="service-detail-page">
+          <div className="detail-loading">Loading service details...</div>
+        </div>
+      );
+    }
+
     return (
       <div className="service-detail-page">
         <div className="detail-error">
