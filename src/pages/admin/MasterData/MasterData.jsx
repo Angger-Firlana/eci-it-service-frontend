@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './MasterData.css';
 import { Modal } from '../../../components/common';
-import { apiRequest, unwrapApiData, API_BASE_URL } from '../../../lib/api';
+import { authenticatedRequest, unwrapApiData, API_BASE_URL } from '../../../lib/api';
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const CACHE_KEYS = {
   deviceTypes: 'eci-masterdata-device-types',
   deviceModels: 'eci-masterdata-device-models',
   serviceTypes: 'eci-masterdata-service-types',
+  vendors: 'eci-masterdata-vendors',
+  departments: 'eci-masterdata-departments',
 };
 
 const readCache = (key) => {
@@ -47,21 +49,29 @@ const MasterData = () => {
   const [deviceTypes, setDeviceTypes] = useState([]);
   const [deviceModels, setDeviceModels] = useState([]);
   const [serviceTypes, setServiceTypes] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [departments, setDepartments] = useState([]);
 
   const [deviceSearch, setDeviceSearch] = useState('');
   const [modelSearch, setModelSearch] = useState('');
   const [serviceSearch, setServiceSearch] = useState('');
+  const [vendorSearch, setVendorSearch] = useState('');
+  const [departmentSearch, setDepartmentSearch] = useState('');
 
   const [loading, setLoading] = useState({
     device: false,
     model: false,
     service: false,
+    vendor: false,
+    department: false,
   });
 
   const [errors, setErrors] = useState({
     device: '',
     model: '',
     service: '',
+    vendor: '',
+    department: '',
   });
 
   const [editingItem, setEditingItem] = useState(null);
@@ -72,6 +82,15 @@ const MasterData = () => {
     model: '',
   });
   const [serviceForm, setServiceForm] = useState({ name: '' });
+  const [vendorForm, setVendorForm] = useState({
+    name: '',
+    maps_url: '',
+    description: '',
+  });
+  const [departmentForm, setDepartmentForm] = useState({
+    name: '',
+    code: '',
+  });
 
   const deviceTypeMap = useMemo(() => {
     return deviceTypes.reduce((acc, item) => {
@@ -105,6 +124,27 @@ const MasterData = () => {
       String(item.name || '').toLowerCase().includes(keyword)
     );
   }, [serviceSearch, serviceTypes]);
+
+  const filteredVendors = useMemo(() => {
+    const keyword = vendorSearch.trim().toLowerCase();
+    if (!keyword) return vendors;
+    return vendors.filter((item) => {
+      const name = String(item.name || '').toLowerCase();
+      const mapsUrl = String(item.maps_url || '').toLowerCase();
+      const description = String(item.description || '').toLowerCase();
+      return name.includes(keyword) || mapsUrl.includes(keyword) || description.includes(keyword);
+    });
+  }, [vendorSearch, vendors]);
+
+  const filteredDepartments = useMemo(() => {
+    const keyword = departmentSearch.trim().toLowerCase();
+    if (!keyword) return departments;
+    return departments.filter((item) => {
+      const name = String(item.name || '').toLowerCase();
+      const code = String(item.code || '').toLowerCase();
+      return name.includes(keyword) || code.includes(keyword);
+    });
+  }, [departmentSearch, departments]);
 
   const getErrorMessage = (payload) => {
     if (!payload) return 'Request gagal.';
@@ -146,7 +186,7 @@ const MasterData = () => {
     setTabLoading('device', true);
     setTabError('device', '');
     try {
-      const res = await apiRequest('/device-type');
+      const res = await authenticatedRequest('/device-type');
       if (!res.ok || res.data?.success === false) {
         throw new Error(getErrorMessage(res.data));
       }
@@ -173,7 +213,7 @@ const MasterData = () => {
     setTabLoading('model', true);
     setTabError('model', '');
     try {
-      const res = await apiRequest('/device-model');
+      const res = await authenticatedRequest('/device-model');
       if (!res.ok || res.data?.success === false) {
         throw new Error(getErrorMessage(res.data));
       }
@@ -200,7 +240,7 @@ const MasterData = () => {
     setTabLoading('service', true);
     setTabError('service', '');
     try {
-      const res = await apiRequest('/references/service-types');
+      const res = await authenticatedRequest('/references/service-types');
       if (!res.ok || res.data?.success === false) {
         throw new Error(getErrorMessage(res.data));
       }
@@ -212,6 +252,60 @@ const MasterData = () => {
       setTabError('service', error.message || 'Gagal mengambil data.');
     } finally {
       setTabLoading('service', false);
+    }
+  };
+
+  const fetchVendors = async () => {
+    const cached = readCache(CACHE_KEYS.vendors);
+    if (cached?.length) {
+      setVendors(cached);
+      setTabError('vendor', '');
+      setTabLoading('vendor', false);
+      return;
+    }
+
+    setTabLoading('vendor', true);
+    setTabError('vendor', '');
+    try {
+      const res = await authenticatedRequest('/vendors?per_page=200');
+      if (!res.ok) {
+        throw new Error(getErrorMessage(res.data));
+      }
+
+      const list = Array.isArray(res.data?.data) ? res.data.data : [];
+      setVendors(list);
+      writeCache(CACHE_KEYS.vendors, list);
+    } catch (error) {
+      setTabError('vendor', error.message || 'Gagal mengambil data vendor.');
+    } finally {
+      setTabLoading('vendor', false);
+    }
+  };
+
+  const fetchDepartments = async () => {
+    const cached = readCache(CACHE_KEYS.departments);
+    if (cached?.length) {
+      setDepartments(cached);
+      setTabError('department', '');
+      setTabLoading('department', false);
+      return;
+    }
+
+    setTabLoading('department', true);
+    setTabError('department', '');
+    try {
+      const res = await authenticatedRequest('/departments?per_page=200');
+      if (!res.ok || res.data?.success === false) {
+        throw new Error(getErrorMessage(res.data));
+      }
+      const payload = unwrapApiData(res.data);
+      const list = Array.isArray(payload) ? payload : [];
+      setDepartments(list);
+      writeCache(CACHE_KEYS.departments, list);
+    } catch (error) {
+      setTabError('department', error.message || 'Gagal mengambil data departemen.');
+    } finally {
+      setTabLoading('department', false);
     }
   };
 
@@ -234,7 +328,26 @@ const MasterData = () => {
         fetchServiceTypes();
       }
     }
-  }, [activeTab, deviceModels.length, deviceTypes.length, serviceTypes.length]);
+
+    if (activeTab === 'vendor') {
+      if (vendors.length === 0) {
+        fetchVendors();
+      }
+    }
+
+    if (activeTab === 'department') {
+      if (departments.length === 0) {
+        fetchDepartments();
+      }
+    }
+  }, [
+    activeTab,
+    deviceModels.length,
+    deviceTypes.length,
+    serviceTypes.length,
+    vendors.length,
+    departments.length,
+  ]);
 
   const openModal = (mode = 'create', item = null) => {
     setModalError('');
@@ -257,6 +370,21 @@ const MasterData = () => {
     if (activeTab === 'service') {
       setServiceForm({ name: item?.name || '' });
     }
+
+    if (activeTab === 'vendor') {
+      setVendorForm({
+        name: item?.name || '',
+        maps_url: item?.maps_url || '',
+        description: item?.description || '',
+      });
+    }
+
+    if (activeTab === 'department') {
+      setDepartmentForm({
+        name: item?.name || '',
+        code: item?.code || '',
+      });
+    }
   };
 
   const closeModal = () => {
@@ -278,7 +406,7 @@ const MasterData = () => {
       setDeviceTypes((prev) => [optimisticItem, ...prev]);
       closeModal();
 
-      const res = await apiRequest('/device-type', {
+      const res = await authenticatedRequest('/device-type', {
         method: 'POST',
         body: payload,
       });
@@ -313,7 +441,7 @@ const MasterData = () => {
       return;
     }
     try {
-      const res = await apiRequest(`/device-type/${editingItem.id}`, {
+      const res = await authenticatedRequest(`/device-type/${editingItem.id}`, {
         method: 'PUT',
         body: payload,
       });
@@ -344,7 +472,7 @@ const MasterData = () => {
       return next;
     });
     try {
-      const res = await apiRequest(`/device-type/${item.id}`, { method: 'DELETE' });
+      const res = await authenticatedRequest(`/device-type/${item.id}`, { method: 'DELETE' });
       if (!res.ok || res.data?.success === false) {
         throw new Error(getErrorMessage(res.data));
       }
@@ -373,7 +501,7 @@ const MasterData = () => {
       setDeviceModels((prev) => [optimisticItem, ...prev]);
       closeModal();
 
-      const res = await apiRequest('/device-model', {
+      const res = await authenticatedRequest('/device-model', {
         method: 'POST',
         body: payload,
       });
@@ -414,7 +542,7 @@ const MasterData = () => {
     }
 
     try {
-      const res = await apiRequest(`/device-model/${editingItem.id}`, {
+      const res = await authenticatedRequest(`/device-model/${editingItem.id}`, {
         method: 'PUT',
         body: payload,
       });
@@ -445,7 +573,7 @@ const MasterData = () => {
       return next;
     });
     try {
-      const res = await apiRequest(`/device-model/${item.id}`, { method: 'DELETE' });
+      const res = await authenticatedRequest(`/device-model/${item.id}`, { method: 'DELETE' });
       if (!res.ok || res.data?.success === false) {
         throw new Error(getErrorMessage(res.data));
       }
@@ -456,8 +584,289 @@ const MasterData = () => {
     }
   };
 
-  const handleServiceReadOnly = () => {
-    setModalError('Endpoint untuk tambah/edit service type belum tersedia di API.');
+  const handleCreateServiceType = async () => {
+    const payload = { name: serviceForm.name.trim() };
+    if (!payload.name) {
+      setModalError('Nama service wajib diisi.');
+      return;
+    }
+
+    const tempId = `temp-${Date.now()}`;
+    try {
+      const optimisticItem = { id: tempId, name: payload.name, __optimistic: true };
+      setServiceTypes((prev) => [optimisticItem, ...prev]);
+      closeModal();
+
+      const res = await authenticatedRequest('/references/service-types', {
+        method: 'POST',
+        body: payload,
+      });
+      if (!res.ok || res.data?.success === false) {
+        throw new Error(getErrorMessage(res.data));
+      }
+
+      const created = unwrapApiData(res.data);
+      if (created?.id) {
+        setServiceTypes((prev) => {
+          const next = prev.map((item) => (item.id === tempId ? created : item));
+          writeCache(CACHE_KEYS.serviceTypes, next);
+          return next;
+        });
+      } else {
+        await fetchServiceTypes();
+      }
+    } catch (error) {
+      setServiceTypes((prev) => {
+        const next = prev.filter((item) => item.id !== tempId);
+        writeCache(CACHE_KEYS.serviceTypes, next);
+        return next;
+      });
+      setTabError('service', error.message || 'Gagal menyimpan jenis service.');
+    }
+  };
+
+  const isValidUrl = (value) => {
+    if (!value) return false;
+    try {
+      // eslint-disable-next-line no-new
+      new URL(value);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  };
+
+  const handleCreateVendor = async () => {
+    const payload = {
+      name: vendorForm.name.trim(),
+      maps_url: vendorForm.maps_url.trim(),
+      description: vendorForm.description.trim(),
+    };
+
+    if (!payload.name) {
+      setModalError('Nama vendor wajib diisi.');
+      return;
+    }
+
+    if (!payload.maps_url || !isValidUrl(payload.maps_url)) {
+      setModalError('Maps URL wajib diisi (format url).');
+      return;
+    }
+
+    if (!payload.description) {
+      setModalError('Deskripsi/alamat wajib diisi.');
+      return;
+    }
+
+    const tempId = `temp-${Date.now()}`;
+    try {
+      const optimisticItem = {
+        id: tempId,
+        ...payload,
+        __optimistic: true,
+      };
+      setVendors((prev) => [optimisticItem, ...prev]);
+      closeModal();
+
+      const res = await authenticatedRequest('/vendors', {
+        method: 'POST',
+        body: payload,
+      });
+
+      if (!res.ok) {
+        throw new Error(getErrorMessage(res.data));
+      }
+
+      const created = res.data;
+      if (created?.id) {
+        setVendors((prev) => {
+          const next = prev.map((item) => (item.id === tempId ? created : item));
+          writeCache(CACHE_KEYS.vendors, next);
+          return next;
+        });
+      } else {
+        await fetchVendors();
+      }
+    } catch (error) {
+      setVendors((prev) => {
+        const next = prev.filter((item) => item.id !== tempId);
+        writeCache(CACHE_KEYS.vendors, next);
+        return next;
+      });
+      setTabError('vendor', error.message || 'Gagal menyimpan vendor.');
+    }
+  };
+
+  const handleUpdateVendor = async () => {
+    if (!editingItem) return;
+
+    const payload = {
+      name: vendorForm.name.trim(),
+      maps_url: vendorForm.maps_url.trim(),
+      description: vendorForm.description.trim(),
+    };
+
+    if (!payload.name) {
+      setModalError('Nama vendor wajib diisi.');
+      return;
+    }
+
+    if (!payload.maps_url || !isValidUrl(payload.maps_url)) {
+      setModalError('Maps URL wajib diisi (format url).');
+      return;
+    }
+
+    if (!payload.description) {
+      setModalError('Deskripsi/alamat wajib diisi.');
+      return;
+    }
+
+    try {
+      const res = await authenticatedRequest(`/vendors/${editingItem.id}`, {
+        method: 'PUT',
+        body: payload,
+      });
+      if (!res.ok) {
+        throw new Error(getErrorMessage(res.data));
+      }
+      const updated = res.data || payload;
+      setVendors((prev) => {
+        const next = prev.map((item) =>
+          item.id === editingItem.id ? { ...item, ...updated } : item
+        );
+        writeCache(CACHE_KEYS.vendors, next);
+        return next;
+      });
+      closeModal();
+    } catch (error) {
+      setModalError(error.message || 'Gagal memperbarui vendor.');
+    }
+  };
+
+  const handleDeleteVendor = async (item) => {
+    const confirmed = window.confirm(`Hapus vendor "${item.name}"?`);
+    if (!confirmed) return;
+    const prevItems = vendors;
+    setVendors((prev) => {
+      const next = prev.filter((entry) => entry.id !== item.id);
+      writeCache(CACHE_KEYS.vendors, next);
+      return next;
+    });
+    try {
+      const res = await authenticatedRequest(`/vendors/${item.id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        throw new Error(getErrorMessage(res.data));
+      }
+    } catch (error) {
+      setVendors(prevItems);
+      writeCache(CACHE_KEYS.vendors, prevItems);
+      setTabError('vendor', error.message || 'Gagal menghapus vendor.');
+    }
+  };
+
+  const handleCreateDepartment = async () => {
+    const payload = {
+      name: departmentForm.name.trim(),
+      code: departmentForm.code.trim(),
+    };
+
+    if (!payload.name || !payload.code) {
+      setModalError('Nama dan kode departemen wajib diisi.');
+      return;
+    }
+
+    const tempId = `temp-${Date.now()}`;
+    try {
+      const optimisticItem = { id: tempId, ...payload, __optimistic: true };
+      setDepartments((prev) => [optimisticItem, ...prev]);
+      closeModal();
+
+      const res = await authenticatedRequest('/departments', {
+        method: 'POST',
+        body: payload,
+      });
+      if (!res.ok || res.data?.success === false) {
+        throw new Error(getErrorMessage(res.data));
+      }
+
+      const created = unwrapApiData(res.data);
+      if (created?.id) {
+        setDepartments((prev) => {
+          const next = prev.map((item) => (item.id === tempId ? created : item));
+          writeCache(CACHE_KEYS.departments, next);
+          return next;
+        });
+      } else {
+        await fetchDepartments();
+      }
+    } catch (error) {
+      setDepartments((prev) => {
+        const next = prev.filter((item) => item.id !== tempId);
+        writeCache(CACHE_KEYS.departments, next);
+        return next;
+      });
+      setTabError('department', error.message || 'Gagal menyimpan departemen.');
+    }
+  };
+
+  const handleUpdateDepartment = async () => {
+    if (!editingItem) return;
+    const payload = {
+      name: departmentForm.name.trim(),
+      code: departmentForm.code.trim(),
+    };
+
+    // Backend service currently expects both name+code.
+    if (!payload.name || !payload.code) {
+      setModalError('Nama dan kode departemen wajib diisi.');
+      return;
+    }
+
+    try {
+      const res = await authenticatedRequest(`/departments/${editingItem.id}`, {
+        method: 'PUT',
+        body: payload,
+      });
+      if (!res.ok || res.data?.success === false) {
+        throw new Error(getErrorMessage(res.data));
+      }
+      const updated = unwrapApiData(res.data) || payload;
+      setDepartments((prev) => {
+        const next = prev.map((item) =>
+          item.id === editingItem.id ? { ...item, ...updated } : item
+        );
+        writeCache(CACHE_KEYS.departments, next);
+        return next;
+      });
+      closeModal();
+    } catch (error) {
+      setModalError(error.message || 'Gagal memperbarui departemen.');
+    }
+  };
+
+  const handleDeleteDepartment = async (item) => {
+    const confirmed = window.confirm(`Hapus departemen "${item.name}"?`);
+    if (!confirmed) return;
+    const prevItems = departments;
+    setDepartments((prev) => {
+      const next = prev.filter((entry) => entry.id !== item.id);
+      writeCache(CACHE_KEYS.departments, next);
+      return next;
+    });
+    try {
+      const res = await authenticatedRequest(`/departments/${item.id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok || res.data?.success === false) {
+        throw new Error(getErrorMessage(res.data));
+      }
+    } catch (error) {
+      setDepartments(prevItems);
+      writeCache(CACHE_KEYS.departments, prevItems);
+      setTabError('department', error.message || 'Gagal menghapus departemen.');
+    }
   };
 
   const renderStatusRow = (message) => (
@@ -499,6 +908,26 @@ const MasterData = () => {
           >
             Service
           </button>
+
+          <button
+            type="button"
+            className={`admin-master-tab ${
+              activeTab === 'vendor' ? 'active' : ''
+            }`}
+            onClick={() => setActiveTab('vendor')}
+          >
+            Vendor
+          </button>
+
+          <button
+            type="button"
+            className={`admin-master-tab ${
+              activeTab === 'department' ? 'active' : ''
+            }`}
+            onClick={() => setActiveTab('department')}
+          >
+            Departemen
+          </button>
         </div>
 
         <div className="admin-master-toolbar">
@@ -507,6 +936,8 @@ const MasterData = () => {
               {activeTab === 'device' && 'Daftar Perangkat'}
               {activeTab === 'model' && 'Daftar Model'}
               {activeTab === 'service' && 'Daftar Jenis Service'}
+              {activeTab === 'vendor' && 'Daftar Vendor'}
+              {activeTab === 'department' && 'Daftar Departemen'}
             </div>
             <div className="admin-master-subtitle">
               API: {API_BASE_URL}
@@ -516,7 +947,7 @@ const MasterData = () => {
             )}
           </div>
 
-          <div className="admin-master-actions">
+            <div className="admin-master-actions">
             {activeTab === 'model' && (
               <>
                 <button className="admin-filter-btn" type="button">
@@ -532,22 +963,37 @@ const MasterData = () => {
               </>
             )}
 
-            {(activeTab === 'model' || activeTab === 'service') && (
-              <div className="admin-search-box">
-                <input
-                  type="text"
-                  placeholder="Cari"
-                  aria-label="Search"
-                  value={activeTab === 'model' ? modelSearch : serviceSearch}
-                  onChange={(event) =>
-                    activeTab === 'model'
-                      ? setModelSearch(event.target.value)
-                      : setServiceSearch(event.target.value)
-                  }
-                />
-                <i className="bi bi-search"></i>
-              </div>
-            )}
+              {(activeTab === 'model' ||
+                activeTab === 'service' ||
+                activeTab === 'vendor' ||
+                activeTab === 'department') && (
+                <div className="admin-search-box">
+                  <input
+                    type="text"
+                    placeholder="Cari"
+                    aria-label="Search"
+                    value={
+                      activeTab === 'model'
+                        ? modelSearch
+                        : activeTab === 'service'
+                        ? serviceSearch
+                        : activeTab === 'vendor'
+                        ? vendorSearch
+                        : departmentSearch
+                    }
+                    onChange={(event) =>
+                      activeTab === 'model'
+                        ? setModelSearch(event.target.value)
+                        : activeTab === 'service'
+                        ? setServiceSearch(event.target.value)
+                        : activeTab === 'vendor'
+                        ? setVendorSearch(event.target.value)
+                        : setDepartmentSearch(event.target.value)
+                    }
+                  />
+                  <i className="bi bi-search"></i>
+                </div>
+              )}
 
             {activeTab === 'device' && (
               <div className="admin-search-box">
@@ -566,12 +1012,7 @@ const MasterData = () => {
               className="admin-master-add"
               type="button"
               onClick={() => openModal('create')}
-              disabled={activeTab === 'service'}
-              title={
-                activeTab === 'service'
-                  ? 'Service type belum punya endpoint tambah/edit'
-                  : 'Tambah data'
-              }
+              title="Tambah data"
             >
               <span>+ Tambah</span>
             </button>
@@ -683,6 +1124,88 @@ const MasterData = () => {
                   ))}
             </>
           )}
+
+          {activeTab === 'vendor' && (
+            <>
+              <div className="admin-master-row admin-master-head admin-master-vendor-head">
+                <div>Nama Vendor</div>
+                <div>Maps URL</div>
+                <div>Deskripsi/Alamat</div>
+                <div className="admin-master-action-col">Aksi</div>
+              </div>
+              {loading.vendor && filteredVendors.length === 0 &&
+                renderStatusRow('Memuat data...')}
+              {!loading.vendor && errors.vendor && renderStatusRow(errors.vendor)}
+              {!loading.vendor && !errors.vendor && filteredVendors.length === 0
+                ? renderStatusRow('Data kosong.')
+                : filteredVendors.map((row) => (
+                    <div className="admin-master-row admin-master-vendor-row" key={row.id}>
+                      <div>{row.name}</div>
+                      <div>{row.maps_url || '-'}</div>
+                      <div>{row.description || '-'}</div>
+                      <div className="admin-master-actions-cell">
+                        <button
+                          type="button"
+                          className="admin-master-icon"
+                          onClick={() => openModal('edit', row)}
+                        >
+                          <i className="bi bi-pencil"></i>
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-master-icon"
+                          onClick={() => handleDeleteVendor(row)}
+                        >
+                          <i className="bi bi-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+            </>
+          )}
+
+          {activeTab === 'department' && (
+            <>
+              <div className="admin-master-row admin-master-head admin-master-dept-head">
+                <div>Nama Departemen</div>
+                <div>Kode</div>
+                <div className="admin-master-action-col">Aksi</div>
+              </div>
+
+              {loading.department && filteredDepartments.length === 0 &&
+                renderStatusRow('Memuat data...')}
+
+              {!loading.department && errors.department && renderStatusRow(errors.department)}
+
+              {!loading.department && !errors.department && filteredDepartments.length === 0
+                ? renderStatusRow('Data kosong.')
+                : filteredDepartments.map((row) => (
+                    <div
+                      className="admin-master-row admin-master-dept-row"
+                      key={row.id}
+                    >
+                      <div>{row.name}</div>
+                      <div>{row.code}</div>
+                      <div className="admin-master-actions-cell">
+                        <button
+                          type="button"
+                          className="admin-master-icon"
+                          onClick={() => openModal('edit', row)}
+                        >
+                          <i className="bi bi-pencil"></i>
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-master-icon"
+                          onClick={() => handleDeleteDepartment(row)}
+                        >
+                          <i className="bi bi-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+            </>
+          )}
         </div>
       </section>
 
@@ -783,7 +1306,7 @@ const MasterData = () => {
           <i className="bi bi-x"></i>
         </button>
         <h2>Tambah Jenis Service</h2>
-        <p>Tambahkan jenis ...</p>
+        <p>Tambahkan jenis service untuk request.</p>
         {modalError && <div className="admin-modal-error">{modalError}</div>}
         <div className="admin-modal-field">
           <label>Jenis</label>
@@ -795,7 +1318,116 @@ const MasterData = () => {
           />
         </div>
         <div className="admin-modal-actions">
-          <button className="admin-modal-save" type="button" onClick={handleServiceReadOnly}>
+          <button className="admin-modal-save" type="button" onClick={handleCreateServiceType}>
+            Simpan
+          </button>
+        </div>
+      </Modal>
+
+      <Modal isOpen={modal === 'vendor'} onClose={closeModal} className="admin-modal">
+        <button className="admin-modal-close" type="button" onClick={closeModal}>
+          <i className="bi bi-x"></i>
+        </button>
+        <h2>{modalMode === 'edit' ? 'Edit Vendor' : 'Tambah Vendor'}</h2>
+        <p>Tambahkan vendor/service location.</p>
+        {modalError && <div className="admin-modal-error">{modalError}</div>}
+
+        <div className="admin-modal-field">
+          <label>Nama Vendor</label>
+          <input
+            type="text"
+            placeholder="Masukkan nama vendor"
+            value={vendorForm.name}
+            onChange={(event) =>
+              setVendorForm((prev) => ({ ...prev, name: event.target.value }))
+            }
+          />
+        </div>
+
+        <div className="admin-modal-field">
+          <label>Maps URL</label>
+          <input
+            type="text"
+            placeholder="https://maps.google.com/..."
+            value={vendorForm.maps_url}
+            onChange={(event) =>
+              setVendorForm((prev) => ({
+                ...prev,
+                maps_url: event.target.value,
+              }))
+            }
+          />
+        </div>
+
+        <div className="admin-modal-field">
+          <label>Deskripsi/Alamat</label>
+          <textarea
+            placeholder="Masukkan deskripsi atau alamat vendor"
+            value={vendorForm.description}
+            onChange={(event) =>
+              setVendorForm((prev) => ({
+                ...prev,
+                description: event.target.value,
+              }))
+            }
+          />
+        </div>
+
+        <div className="admin-modal-actions">
+          <button
+            className="admin-modal-save"
+            type="button"
+            onClick={modalMode === 'edit' ? handleUpdateVendor : handleCreateVendor}
+          >
+            Simpan
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={modal === 'department'}
+        onClose={closeModal}
+        className="admin-modal"
+      >
+        <button className="admin-modal-close" type="button" onClick={closeModal}>
+          <i className="bi bi-x"></i>
+        </button>
+        <h2>{modalMode === 'edit' ? 'Edit Departemen' : 'Tambah Departemen'}</h2>
+        <p>Kelola departemen untuk user.</p>
+        {modalError && <div className="admin-modal-error">{modalError}</div>}
+
+        <div className="admin-modal-field">
+          <label>Nama Departemen</label>
+          <input
+            type="text"
+            placeholder="Contoh: Finance"
+            value={departmentForm.name}
+            onChange={(event) =>
+              setDepartmentForm((prev) => ({ ...prev, name: event.target.value }))
+            }
+          />
+        </div>
+
+        <div className="admin-modal-field">
+          <label>Kode</label>
+          <input
+            type="text"
+            placeholder="Contoh: FIN"
+            value={departmentForm.code}
+            onChange={(event) =>
+              setDepartmentForm((prev) => ({ ...prev, code: event.target.value }))
+            }
+          />
+        </div>
+
+        <div className="admin-modal-actions">
+          <button
+            className="admin-modal-save"
+            type="button"
+            onClick={
+              modalMode === 'edit' ? handleUpdateDepartment : handleCreateDepartment
+            }
+          >
             Simpan
           </button>
         </div>

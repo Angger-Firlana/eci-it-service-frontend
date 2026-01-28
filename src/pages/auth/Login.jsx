@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Login.css';
+import logoImg from '../../assets/images/logo-removebg-preview.png';
 import robotImg from '../../assets/images/login_maskot.png';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiRequest } from '../../lib/api';
@@ -39,8 +40,6 @@ const Login = () => {
         },
       });
 
-      console.log('Login response:', response);
-
       if (response.ok && response.data) {
         // Backend returns: { success, data: { user, token }, message }
         const responseData = response.data.data || response.data;
@@ -52,12 +51,26 @@ const Login = () => {
           throw new Error('Invalid response from server');
         }
 
+        const roleValueRaw =
+          typeof rawUser.role === 'string'
+            ? rawUser.role
+            : rawUser.role?.name || rawUser.role_name;
+
+        const normalizeRole = (value) => {
+          const v = String(value || '').toLowerCase();
+          if (v.includes('admin')) return 'admin';
+          if (v.includes('atasan') || v.includes('supervisor') || v.includes('manager')) {
+            return 'atasan';
+          }
+          return 'user';
+        };
+
         // Transform user object to match frontend expectations
         const user = {
           id: rawUser.id,
           name: rawUser.name,
           email: rawUser.email,
-          role: rawUser.role?.name || 'user',
+          role: normalizeRole(roleValueRaw),
           department: rawUser.department?.name || rawUser.department?.code || 'N/A',
         };
 
@@ -110,19 +123,21 @@ const Login = () => {
 
   return (
     <div className="login-page">
-      <div className="login-hero" aria-hidden="true"></div>
-
       <div className="login-card">
+        <div className="login-brand">
+          <img src={logoImg} alt="Electronic City" className="login-logo" />
+        </div>
+
         <h1>Welcome!</h1>
         <p>Please enter your details</p>
         <div className="login-divider"></div>
 
         <form onSubmit={handleLogin}>
           <label>
-            Email
+            Username
             <input
               type="text"
-              placeholder="Email"
+              placeholder="Username"
               value={credentials.email}
               onChange={handleCredentialChange('email')}
               disabled={isLoading}
@@ -151,7 +166,7 @@ const Login = () => {
           </button>
         </form>
 
-        <div className="login-alt">
+        <div className="login-alt" aria-label="Dev login shortcuts">
           <button
             type="button"
             className="login-alt-btn"
@@ -178,7 +193,7 @@ const Login = () => {
           </button>
         </div>
 
-        <img src={robotImg} alt="" className="login-robot" />
+        <img src={robotImg} alt="" className="login-robot" aria-hidden="true" />
       </div>
     </div>
   );

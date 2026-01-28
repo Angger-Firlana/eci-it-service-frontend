@@ -165,6 +165,16 @@
   grid-template-columns: 1fr 1fr 1fr 120px;
 }
 
+.admin-master-vendor-row,
+.admin-master-vendor-head {
+  grid-template-columns: 0.9fr 1fr 1.4fr 120px;
+}
+
+.admin-master-dept-row,
+.admin-master-dept-head {
+  grid-template-columns: 1fr 0.5fr 120px;
+}
+
 .admin-master-head {
   background: #F4F6FB;
   color: #6b6b6b;
@@ -224,5 +234,15 @@
   .admin-master-model-row,
   .admin-master-model-head {
     min-width: 560px;
+  }
+
+  .admin-master-vendor-row,
+  .admin-master-vendor-head {
+    min-width: 720px;
+  }
+
+  .admin-master-dept-row,
+  .admin-master-dept-head {
+    min-width: 520px;
   }
 }
