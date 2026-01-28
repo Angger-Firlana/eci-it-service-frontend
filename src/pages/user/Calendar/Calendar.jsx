@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import './Calendar.css';
 import { authenticatedRequest } from '../../../lib/api';
 import { useServiceCache } from '../../../contexts/ServiceCacheContext';
+import { useAuth } from '../../../contexts/AuthContext';
 
 const Calendar = () => {
   const navigate = useNavigate();
   const { calendarCache, updateCalendarCache, isCalendarCacheValid } = useServiceCache();
+  const { user } = useAuth();
   const [services, setServices] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -57,7 +59,9 @@ const Calendar = () => {
 
       setIsLoading(true);
       try {
-        const response = await authenticatedRequest('/service-requests?per_page=100');
+        const userId = user?.id;
+        const userFilter = userId ? `&user_id=${userId}` : '';
+        const response = await authenticatedRequest(`/service-requests?per_page=100${userFilter}`);
         if (response.ok && response.data) {
           const data = response.data.data || response.data;
           const servicesData = Array.isArray(data) ? data : data.data || [];
@@ -73,7 +77,7 @@ const Calendar = () => {
     };
 
     fetchServices();
-  }, [calendarCache, updateCalendarCache, isCalendarCacheValid]);
+  }, [calendarCache, updateCalendarCache, isCalendarCacheValid, user?.id]);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();

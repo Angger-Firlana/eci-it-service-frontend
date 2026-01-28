@@ -2,13 +2,19 @@ import React from 'react';
 import './RequestList.css';
 import RequestItem from '../RequestItem';
 
-const RequestList = ({ requests, onViewAll, onViewDetails }) => {
+const RequestList = ({
+  requests,
+  onViewAll,
+  onViewDetails,
+  title = 'Request Terbaru',
+  viewAllLabel = 'Lihat Semua',
+}) => {
   return (
     <section className="panel">
       <div className="panel-head">
-        <div className="title">Request Terbaru</div>
+        <div className="title">{title}</div>
         <a href="#" onClick={(e) => {e.preventDefault(); onViewAll();}}>
-          Lihat Semua
+          {viewAllLabel}
         </a>
       </div>
 

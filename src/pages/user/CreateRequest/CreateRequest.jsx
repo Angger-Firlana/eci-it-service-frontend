@@ -5,9 +5,11 @@ import backIcon from '../../../assets/icons/back.svg';
 import nextIcon from '../../../assets/icons/next.svg';
 import { authenticatedRequest } from '../../../lib/api';
 import { useServiceCache } from '../../../contexts/ServiceCacheContext';
+import { useAuth } from '../../../contexts/AuthContext';
 
 const CreateRequest = () => {
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingMaster, setIsSavingMaster] = useState(false);
@@ -509,12 +511,25 @@ const CreateRequest = () => {
 
       const formData = new FormData();
 
-      // Get user data for admin_id (for now, we'll use a default or get from auth)
-      const userResponse = await authenticatedRequest('/auth/me');
-      const userId = userResponse.data?.data?.id || userResponse.data?.id || 1;
+      const defaultAdminId = String(import.meta.env.VITE_DEFAULT_ADMIN_ID || '1');
 
-      formData.append('admin_id', '1'); // Default admin - adjust as needed
-      formData.append('user_id', userId);
+      let currentUserId = authUser?.id || null;
+      if (!currentUserId) {
+        const userResponse = await authenticatedRequest('/auth/me');
+        currentUserId = userResponse.data?.data?.id || userResponse.data?.id || null;
+      }
+
+      const isAdminBucket = String(authUser?.role || '').toLowerCase() === 'admin';
+      const adminIdForPayload = isAdminBucket ? currentUserId : defaultAdminId;
+
+      if (!adminIdForPayload) {
+        throw new Error('Admin ID is required');
+      }
+
+      formData.append('admin_id', String(adminIdForPayload));
+      if (currentUserId) {
+        formData.append('user_id', String(currentUserId));
+      }
       formData.append('request_date', new Date().toISOString().split('T')[0]);
       formData.append('status_id', '1'); // Pending status
 

@@ -156,3 +156,64 @@
     min-width: 860px;
   }
 }
+
+.admin-service-loading,
+.admin-service-error {
+  background: #fff;
+  border-radius: 12px;
+  padding: 28px;
+  text-align: center;
+  color: #666;
+  border: 1px solid #D9D9D9;
+}
+
+.admin-service-error {
+  color: #c33;
+}
+
+.admin-service-error button {
+  margin-top: 12px;
+  background: #2f66ff;
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 24px;
+  cursor: pointer;
+}
+
+.admin-service-empty {
+  padding: 18px 14px;
+  color: #6b6b6b;
+  font-size: 12px;
+}
+
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 4px;
+}
+
+.admin-pagination-btn {
+  background: #fff;
+  border: 1px solid #D9D9D9;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #4b4b4b;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.admin-pagination-info {
+  font-size: 12px;
+  color: #6b6b6b;
+}

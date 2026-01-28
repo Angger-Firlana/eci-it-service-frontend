@@ -92,8 +92,10 @@ const Dashboard = ({ user }) => {
           return;
         }
 
+        const userId = user?.id;
+        const userFilter = userId ? `&user_id=${userId}` : '';
         const response = await authenticatedRequest(
-          '/service-requests?per_page=10&sort=created_at&order=desc'
+          `/service-requests?per_page=10${userFilter}`
         );
 
         if (response.ok && response.data) {

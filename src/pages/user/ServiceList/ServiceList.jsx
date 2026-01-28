@@ -4,8 +4,10 @@ import './ServiceList.css';
 import eyeIcon from '../../../assets/icons/lihatdetail(eye).svg';
 import { authenticatedRequest } from '../../../lib/api';
 import { useServiceCache } from '../../../contexts/ServiceCacheContext';
+import { useAuth } from '../../../contexts/AuthContext';
 
 const ServiceList = () => {
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const currentPage = parseInt(searchParams.get('page') || '1', 10);
 
@@ -52,8 +54,10 @@ const ServiceList = () => {
       setError(null);
 
       try {
+        const userId = user?.id;
+        const userFilter = userId ? `&user_id=${userId}` : '';
         const response = await authenticatedRequest(
-          `/service-requests?page=${currentPage}&per_page=10`
+          `/service-requests?page=${currentPage}&per_page=10${userFilter}`
         );
 
         if (response.ok && response.data) {
@@ -109,7 +113,7 @@ const ServiceList = () => {
     }
 
     fetchServices();
-  }, [currentPage, isCacheValid, serviceListCache, serviceListMeta, updateCache]);
+  }, [currentPage, isCacheValid, serviceListCache, serviceListMeta, updateCache, user?.id]);
 
   const handlePageChange = (newPage) => {
     setSearchParams({ page: newPage.toString() });
