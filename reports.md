@@ -26,7 +26,13 @@ Changes 3
 - timeline description: Updated timeline mapping in `ServiceRequestService::getServiceRequestById()` to show "Request dibuat oleh {actor_name}" for CREATE_REQUEST actions.
 ----------
 
-Frontend Context Notes (No Backend Changes)
-- Admin "Inbox" is treated as an admin work queue (only requests that require admin action: approve/reject, set lokasi).
-- Vendor lokasi validation requires structured fields: `address`, `city`, `province`, `postal_code`, `maps_url` when `location_type=external`.
-- Backend naming: `vendor_approvals` is used as "Approval Atasan" in the UI (vendor-review statuses are ignored on the frontend).
+Changes 4
+- approval policy eager load: Removed `approval_policy_steps.condition_type` eager load from `app/Services/ApprovalPolicyService.php` because `ApprovalPolicyStep` does not define a `condition_type` relationship.
+- fix 500: This unblocks `/service-requests/{id}/approver` and `/service-requests/{id}/approvals` which were throwing "Call to undefined relationship [condition_type]".
+----------
+
+Changes 5
+- approver endpoint: Fixed return type mismatch in `app/Services/ServiceRequest/ServiceRequestApprovalService.php` (`getApproverByServiceRequestId` now returns array).
+- audit log: Added missing `use App\Models\Status;` import in `app/Services/AuditLogService.php` so `createStatusAuditLog()` typehint resolves correctly.
+- approval policy: Updated `getApprovalPolicyByServiceRequestCost` return type in `app/Services/ApprovalPolicyService.php` to `?ApprovalPolicy` (it can return null).
+----------

@@ -68,6 +68,15 @@ const getDeviceInfo = (detail) => {
 
 const getErrorMessage = (payload, fallback) => {
   if (!payload) return fallback;
+  if (typeof payload === 'string') {
+    if (payload.includes('condition_type') && payload.includes('ApprovalPolicyStep')) {
+      return (
+        'Backend error: Approval policy eager-load references a missing relationship on ApprovalPolicyStep.\n' +
+        'Fix needed in API (remove approval_policy_steps.condition_type eager load).'
+      );
+    }
+    return payload;
+  }
   if (typeof payload?.message === 'string' && payload.message) return payload.message;
   if (payload?.errors && typeof payload.errors === 'object') {
     const lines = [];
@@ -263,6 +272,36 @@ const AdminInboxDetail = ({ onBack } = {}) => {
   }, [allStatusById, vendorApprovals]);
 
   const timelineItems = useMemo(() => {
+    const auditLogs = Array.isArray(detail?.audit_logs) ? detail.audit_logs : [];
+    const auditById = new Map();
+    for (const log of auditLogs) {
+      if (!log?.id) continue;
+      auditById.set(Number(log.id), log);
+    }
+
+    // Prefer backend-built timeline for consistency across pages.
+    if (Array.isArray(detail?.timeline) && detail.timeline.length) {
+      const normalized = [...detail.timeline].sort((a, b) => {
+        const aTime = new Date(a?.created_at || a?.date || 0).getTime();
+        const bTime = new Date(b?.created_at || b?.date || 0).getTime();
+        return aTime - bTime;
+      });
+      return normalized.map((item) => ({
+        id: item?.id || `${item?.label}-${item?.date}`,
+        label: (() => {
+          const baseLabel = item?.label || item?.status || 'Update';
+          if (baseLabel !== 'Status diubah') return baseLabel;
+          const log = item?.id ? auditById.get(Number(item.id)) : null;
+          const newStatusId = log?.new_status_id;
+          const status = newStatusId != null ? allStatusById.get(Number(newStatusId)) : null;
+          return status?.name || baseLabel;
+        })(),
+        date: formatDateTime(item?.date || item?.created_at),
+        note: item?.note || item?.description || '-',
+        state: item?.state || 'active',
+      }));
+    }
+
     const logs = Array.isArray(detail?.audit_logs) ? [...detail.audit_logs] : [];
     logs.sort((a, b) => {
       const aTime = new Date(a?.created_at || 0).getTime();
@@ -303,7 +342,7 @@ const AdminInboxDetail = ({ onBack } = {}) => {
         state: 'active',
       };
     });
-  }, [allStatusById, detail?.audit_logs]);
+  }, [allStatusById, detail?.audit_logs, detail?.timeline]);
 
   const setLocationFormValue = (field) => (event) => {
     const value = event?.target?.value;
@@ -350,25 +389,26 @@ const AdminInboxDetail = ({ onBack } = {}) => {
 
   const handleAdminApprove = async () => {
     if (!id) return;
+    const approvedByAdminId = serviceStatusByCode.get('APPROVED_BY_ADMIN')?.id;
+    if (!approvedByAdminId) {
+      setError('Status APPROVED_BY_ADMIN tidak ditemukan');
+      return;
+    }
     setIsSaving(true);
     setError('');
     try {
-      const res = await authenticatedRequest(`/service-requests/approved-by-admin/${id}`, {
-        method: 'POST',
-        body: actionNote.trim() ? { log_notes: actionNote.trim() } : undefined,
+      // Use PUT so we always get an audit log entry.
+      // The dedicated /approved-by-admin endpoint currently throws 500 in some environments.
+      const res = await authenticatedRequest(`/service-requests/${id}`, {
+        method: 'PUT',
+        body: {
+          status_id: Number(approvedByAdminId),
+          log_notes: actionNote.trim() || 'Request di-approve oleh admin',
+        },
       });
       if (!res.ok) {
         throw new Error(getErrorMessage(res.data, 'Gagal approve request'));
       }
-
-      // The backend approve-by-admin endpoint doesn't emit a status audit log.
-      // Add a timeline entry via PUT (without changing status).
-      await authenticatedRequest(`/service-requests/${id}`, {
-        method: 'PUT',
-        body: {
-          log_notes: actionNote.trim() || 'Request di-approve oleh admin',
-        },
-      });
 
       invalidateServiceRequestCache(id);
       await refresh();
@@ -521,6 +561,10 @@ const AdminInboxDetail = ({ onBack } = {}) => {
         throw new Error('Alamat vendor harus lengkap (alamat, kota, provinsi, kode pos, link maps)');
       }
 
+      const normalizedMapsUrl = /^https?:\/\//i.test(mapsUrl)
+        ? mapsUrl
+        : `https://${mapsUrl}`;
+
       const fee = parseCurrencyNumber(locationForm.serviceFee);
       const cancelFee = parseCurrencyNumber(locationForm.cancellationFee);
       if (!fee) {
@@ -536,7 +580,7 @@ const AdminInboxDetail = ({ onBack } = {}) => {
           city,
           province,
           postal_code: postalCode,
-          maps_url: mapsUrl,
+          maps_url: normalizedMapsUrl,
           is_active: true,
         },
       });
