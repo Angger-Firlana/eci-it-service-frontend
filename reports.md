@@ -36,3 +36,8 @@ Changes 5
 - audit log: Added missing `use App\Models\Status;` import in `app/Services/AuditLogService.php` so `createStatusAuditLog()` typehint resolves correctly.
 - approval policy: Updated `getApprovalPolicyByServiceRequestCost` return type in `app/Services/ApprovalPolicyService.php` to `?ApprovalPolicy` (it can return null).
 ----------
+
+Changes 6
+- audit_logs migration: Created migration `2026_01_29_100000_make_audit_logs_status_ids_nullable.php` to make `old_status_id` and `new_status_id` nullable.
+- fix 500: This unblocks `CREATE_VENDOR_APPROVAL` and `UPDATE_VENDOR_APPROVAL` audit log entries which don't involve status changes.
+----------

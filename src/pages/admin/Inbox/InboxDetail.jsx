@@ -77,13 +77,25 @@ const getErrorMessage = (payload, fallback) => {
     }
     return payload;
   }
-  if (typeof payload?.message === 'string' && payload.message) return payload.message;
+  // Check for validation errors first (Laravel format)
   if (payload?.errors && typeof payload.errors === 'object') {
     const lines = [];
     for (const [key, value] of Object.entries(payload.errors)) {
       lines.push(`${key}: ${Array.isArray(value) ? value.join(', ') : String(value)}`);
     }
     if (lines.length) return lines.join('\n');
+  }
+  // Check for error field (some APIs use this)
+  if (typeof payload?.error === 'string' && payload.error) return payload.error;
+  // Check for message
+  if (typeof payload?.message === 'string' && payload.message) return payload.message;
+  // Try to stringify if object
+  if (typeof payload === 'object') {
+    try {
+      return JSON.stringify(payload);
+    } catch {
+      return fallback;
+    }
   }
   return fallback;
 };
@@ -272,36 +284,25 @@ const AdminInboxDetail = ({ onBack } = {}) => {
   }, [allStatusById, vendorApprovals]);
 
   const timelineItems = useMemo(() => {
-    const auditLogs = Array.isArray(detail?.audit_logs) ? detail.audit_logs : [];
-    const auditById = new Map();
-    for (const log of auditLogs) {
-      if (!log?.id) continue;
-      auditById.set(Number(log.id), log);
-    }
+    const items = [];
+    const seenIds = new Set();
+    const createdAt = detail?.created_at || detail?.request_date;
+    const requesterName = detail?.user?.name || 'User';
+    const currentStatusCode = serviceStatusById.get(Number(detail?.status_id))?.code || '';
 
-    // Prefer backend-built timeline for consistency across pages.
-    if (Array.isArray(detail?.timeline) && detail.timeline.length) {
-      const normalized = [...detail.timeline].sort((a, b) => {
-        const aTime = new Date(a?.created_at || a?.date || 0).getTime();
-        const bTime = new Date(b?.created_at || b?.date || 0).getTime();
-        return aTime - bTime;
+    // Always add creation entry first
+    if (createdAt) {
+      items.push({
+        id: 'created',
+        label: 'Menunggu Approval',
+        date: createdAt,
+        note: `Request dibuat oleh ${requesterName}`,
+        state: 'active',
       });
-      return normalized.map((item) => ({
-        id: item?.id || `${item?.label}-${item?.date}`,
-        label: (() => {
-          const baseLabel = item?.label || item?.status || 'Update';
-          if (baseLabel !== 'Status diubah') return baseLabel;
-          const log = item?.id ? auditById.get(Number(item.id)) : null;
-          const newStatusId = log?.new_status_id;
-          const status = newStatusId != null ? allStatusById.get(Number(newStatusId)) : null;
-          return status?.name || baseLabel;
-        })(),
-        date: formatDateTime(item?.date || item?.created_at),
-        note: item?.note || item?.description || '-',
-        state: item?.state || 'active',
-      }));
+      seenIds.add('created');
     }
 
+    // Process audit_logs to build timeline
     const logs = Array.isArray(detail?.audit_logs) ? [...detail.audit_logs] : [];
     logs.sort((a, b) => {
       const aTime = new Date(a?.created_at || 0).getTime();
@@ -309,40 +310,103 @@ const AdminInboxDetail = ({ onBack } = {}) => {
       return aTime - bTime;
     });
 
-    return logs.map((log) => {
+    for (const log of logs) {
+      // Skip CREATE_REQUEST action - we already added creation entry
+      if (log?.action === 'CREATE_REQUEST') continue;
+
       const newStatus =
         log?.new_status_id != null
           ? allStatusById.get(Number(log.new_status_id))
           : null;
 
-      const actorName = log?.actor?.name || 'Unknown';
-
+      const actorName = log?.actor?.name || 'Admin';
+      const statusCode = newStatus?.code || '';
       let label = newStatus?.name || log?.action || 'Update';
-      let note = log?.notes || '-';
+      let note = '';
 
-      if (log?.action === 'CREATE_REQUEST') {
-        label = newStatus?.name || 'Request dibuat';
-        note = `Request dibuat oleh ${actorName}`;
-      }
-
-      if (log?.action === 'APPROVE_VENDOR') {
+      // Generate proper notes based on status
+      if (statusCode === 'APPROVED_BY_ADMIN') {
+        label = 'Disetujui';
+        note = log?.notes && log.notes.trim() && !log.notes.includes('Request dibuat')
+          ? log.notes
+          : `Disetujui oleh ${actorName}`;
+        seenIds.add('APPROVED_BY_ADMIN');
+      } else if (statusCode === 'IN_PROGRESS') {
+        label = 'Dalam Proses';
+        note = log?.notes || 'Barang sedang diservis';
+        seenIds.add('IN_PROGRESS');
+      } else if (statusCode === 'COMPLETED') {
+        label = 'Selesai';
+        note = log?.notes || 'Service selesai';
+        seenIds.add('COMPLETED');
+      } else if (statusCode === 'REJECTED') {
+        label = 'Ditolak';
+        note = log?.notes || `Ditolak oleh ${actorName}`;
+        seenIds.add('REJECTED');
+      } else if (statusCode === 'IN_REVIEW_ABOVE') {
+        label = 'Menunggu Approve';
+        note = log?.notes || 'Menunggu approve biaya oleh atasan';
+        seenIds.add('IN_REVIEW_ABOVE');
+      } else if (statusCode === 'APPROVED_BY_ABOVE') {
+        label = 'Disetujui Atasan';
+        note = log?.notes || 'Semua atasan sudah approve';
+        seenIds.add('APPROVED_BY_ABOVE');
+      } else if (statusCode === 'REJECTED_BY_ABOVE') {
+        label = 'Ditolak Atasan';
+        note = log?.notes || 'Ada atasan yang menolak';
+        seenIds.add('REJECTED_BY_ABOVE');
+      } else if (log?.action === 'APPROVE_VENDOR') {
         label = 'Approval Atasan';
         note = `Disetujui oleh ${actorName}`;
+      } else {
+        note = log?.notes || '-';
       }
 
-      if (log?.action === 'UPDATE_VENDOR_APPROVAL') {
-        label = 'Approval Atasan';
-      }
-
-      return {
+      items.push({
         id: log?.id || `${log?.action}-${log?.created_at}`,
         label,
-        date: formatDateTime(log?.created_at),
+        date: log?.created_at,
         note,
         state: 'active',
-      };
+      });
+    }
+
+    // If current status is APPROVED_BY_ADMIN but no audit log for it, add synthetic entry
+    if (currentStatusCode === 'APPROVED_BY_ADMIN' && !seenIds.has('APPROVED_BY_ADMIN')) {
+      items.push({
+        id: 'synthetic-approved',
+        label: 'Disetujui',
+        date: detail?.updated_at || createdAt,
+        note: 'Disetujui oleh admin',
+        state: 'active',
+      });
+    }
+
+    // If we're past APPROVED_BY_ADMIN (like IN_REVIEW_ABOVE, IN_PROGRESS, etc), ensure we show it
+    const approvedStatuses = ['IN_REVIEW_ABOVE', 'APPROVED_BY_ABOVE', 'IN_PROGRESS', 'COMPLETED'];
+    if (approvedStatuses.includes(currentStatusCode) && !seenIds.has('APPROVED_BY_ADMIN')) {
+      items.push({
+        id: 'synthetic-approved',
+        label: 'Disetujui',
+        date: createdAt, // Best guess
+        note: 'Disetujui oleh admin',
+        state: 'active',
+      });
+    }
+
+    // Sort all items by date
+    items.sort((a, b) => {
+      const aTime = new Date(a.date || 0).getTime();
+      const bTime = new Date(b.date || 0).getTime();
+      return aTime - bTime;
     });
-  }, [allStatusById, detail?.audit_logs, detail?.timeline]);
+
+    // Format dates after sorting
+    return items.map((item) => ({
+      ...item,
+      date: formatDateTime(item.date),
+    }));
+  }, [allStatusById, detail, serviceStatusById]);
 
   const setLocationFormValue = (field) => (event) => {
     const value = event?.target?.value;
@@ -463,8 +527,11 @@ const AdminInboxDetail = ({ onBack } = {}) => {
     const payload = {
       cost_type_id: Number(costType.id),
       amount: Number(amount),
-      description: description || null,
     };
+    // Only include description if it has a value (backend validation is 'sometimes|string')
+    if (description && typeof description === 'string' && description.trim()) {
+      payload.description = description.trim();
+    }
 
     if (existing?.id) {
       const res = await authenticatedRequest(
@@ -975,14 +1042,16 @@ const AdminInboxDetail = ({ onBack } = {}) => {
                   <div className="admin-timeline-item" key={item.id}>
                     <div className="admin-timeline-marker">
                       <span className={`admin-timeline-dot ${item.state}`}></span>
-                      {index < timelineItems.length - 1 && (
-                        <span className={`admin-timeline-line ${item.state}`}></span>
-                      )}
+                      <span
+                        className={`admin-timeline-connector ${item.state} ${index === timelineItems.length - 1 ? 'tail' : ''}`}
+                      ></span>
                     </div>
                     <div className="admin-timeline-content">
-                      <span className={`admin-timeline-tag ${item.state || 'active'}`}>
-                        {item.label}
-                      </span>
+                      <div className="admin-timeline-meta">
+                        <span className={`admin-timeline-tag ${item.state || 'active'}`}>
+                          {item.label}
+                        </span>
+                      </div>
                       <span className="admin-timeline-date">{item.date}</span>
                       <span className="admin-timeline-desc">{item.note}</span>
                     </div>

@@ -12,3 +12,7 @@ Changes
 - Implemented Admin Inbox Detail approval + set lokasi flow (workshop/vendor) + timeline from audit logs: `src/pages/admin/Inbox/InboxDetail.jsx`
 - Added reference caching helpers for statuses/vendors/cost-types: `src/lib/referenceCache.js`
 - Admin approve uses `PUT /service-requests/:id` to set `APPROVED_BY_ADMIN` so audit log/timeline is created reliably.
+- Fixed Timeline in InboxDetail:
+  - Always shows "Request dibuat" entry first (synthesized from created_at)
+  - Matches ServiceDetail styling with proper vertical connector line
+  - Better status labels: "Menunggu Approval", "Disetujui", "Menunggu Approve", etc.
