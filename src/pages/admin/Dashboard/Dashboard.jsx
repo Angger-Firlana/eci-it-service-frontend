@@ -6,6 +6,7 @@ import RequestList from '../../../components/user/dashboard/RequestList/RequestL
 import adminMascot from '../../../assets/images/admin_maskot.png';
 
 import { authenticatedRequest } from '../../../lib/api';
+import { getServiceRequestDetailCached } from '../../../lib/serviceRequestCache';
 
 const PENDING_STATUS_ID = 1;
 
@@ -46,6 +47,11 @@ const transformServiceRequest = (request) => {
     date: formatDate(request.request_date || request.created_at),
     _original: request,
   };
+};
+
+const needsDetailFetch = (item) => {
+  const firstDetail = item?.service_request_details?.[0];
+  return !firstDetail || !firstDetail.device || !firstDetail.service_type;
 };
 
 const Dashboard = ({ user }) => {
@@ -110,18 +116,16 @@ const Dashboard = ({ user }) => {
 
         const enrichedTop = await Promise.all(
           top.map(async (item) => {
+            if (!needsDetailFetch(item)) return item;
             try {
-              const detailResponse = await authenticatedRequest(`/service-requests/${item.id}`, {
+              return await getServiceRequestDetailCached(item.id, {
                 signal: controller.signal,
               });
-              if (detailResponse.ok && detailResponse.data) {
-                return detailResponse.data.data || detailResponse.data;
-              }
             } catch (err) {
               if (err?.name === 'AbortError') return item;
               console.error('Admin dashboard detail fetch error:', err);
+              return item;
             }
-            return item;
           })
         );
 

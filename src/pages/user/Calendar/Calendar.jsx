@@ -4,6 +4,7 @@ import './Calendar.css';
 import { authenticatedRequest } from '../../../lib/api';
 import { useServiceCache } from '../../../contexts/ServiceCacheContext';
 import { useAuth } from '../../../contexts/AuthContext';
+import { getServiceRequestDetailCached } from '../../../lib/serviceRequestCache';
 
 const Calendar = () => {
   const navigate = useNavigate();
@@ -28,12 +29,7 @@ const Calendar = () => {
           }
 
           try {
-            const detailResponse = await authenticatedRequest(
-              `/service-requests/${item.id}`
-            );
-            if (detailResponse.ok && detailResponse.data) {
-              return detailResponse.data.data || detailResponse.data;
-            }
+            return await getServiceRequestDetailCached(item.id);
           } catch (err) {
             console.error('Calendar detail fetch error:', err);
           }

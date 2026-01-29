@@ -5,6 +5,7 @@ import eyeIcon from '../../../assets/icons/lihatdetail(eye).svg';
 import { authenticatedRequest } from '../../../lib/api';
 import { useServiceCache } from '../../../contexts/ServiceCacheContext';
 import { useAuth } from '../../../contexts/AuthContext';
+import { getServiceRequestDetailCached } from '../../../lib/serviceRequestCache';
 
 const ServiceList = () => {
   const { user } = useAuth();
@@ -32,12 +33,7 @@ const ServiceList = () => {
           }
 
           try {
-            const detailResponse = await authenticatedRequest(
-              `/service-requests/${item.id}`
-            );
-            if (detailResponse.ok && detailResponse.data) {
-              return detailResponse.data.data || detailResponse.data;
-            }
+            return await getServiceRequestDetailCached(item.id);
           } catch (err) {
             console.error('Service detail fetch error:', err);
           }
@@ -80,7 +76,9 @@ const ServiceList = () => {
           const enrichedServices = await enrichServices(servicesData);
           setServices(enrichedServices);
           setPagination(paginationData);
-          updateCache(enrichedServices, paginationData);
+          if (currentPage === 1) {
+            updateCache(enrichedServices, paginationData);
+          }
         } else {
           throw new Error('Failed to fetch services');
         }

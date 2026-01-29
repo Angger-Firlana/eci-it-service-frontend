@@ -5,6 +5,7 @@ import HeroSection from '../../../components/user/dashboard/HeroSection/HeroSect
 import RequestList from '../../../components/user/dashboard/RequestList/RequestList';
 import { authenticatedRequest } from '../../../lib/api';
 import { useServiceCache } from '../../../contexts/ServiceCacheContext';
+import { getServiceRequestDetailCached } from '../../../lib/serviceRequestCache';
 
 // Transform backend data to frontend format
 const transformServiceRequest = (request) => {
@@ -60,12 +61,7 @@ const Dashboard = ({ user }) => {
           }
 
           try {
-            const detailResponse = await authenticatedRequest(
-              `/service-requests/${item.id}`
-            );
-            if (detailResponse.ok && detailResponse.data) {
-              return detailResponse.data.data || detailResponse.data;
-            }
+            return await getServiceRequestDetailCached(item.id);
           } catch (err) {
             console.error('Dashboard detail fetch error:', err);
           }
@@ -118,7 +114,7 @@ const Dashboard = ({ user }) => {
     };
 
     fetchRecentRequests();
-  }, [isCacheValid, serviceListCache, updateCache]);
+  }, [isCacheValid, serviceListCache, updateCache, user?.id]);
 
   const handleViewAll = () => {
     navigate('/services');

@@ -1,8 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import './ServiceList.css';
 import eyeIcon from '../../../assets/icons/lihatdetail(eye).svg';
 import { authenticatedRequest } from '../../../lib/api';
+import {
+  getServiceRequestCostsTotalCached,
+  getServiceRequestDetailCached,
+  getServiceRequestLocationsCached,
+} from '../../../lib/serviceRequestCache';
 
 const PER_PAGE = 10;
 
@@ -29,11 +34,6 @@ const normalizeListPayload = (responseData) => {
 };
 
 const normalizeDetailPayload = (responseData) => responseData?.data || responseData;
-
-const normalizeArrayPayload = (responseData) => {
-  const data = responseData?.data || responseData;
-  return Array.isArray(data) ? data : data?.data || [];
-};
 
 const getDeviceLabel = (service) => {
   const firstDetail = service.service_request_details?.[0];
@@ -69,6 +69,11 @@ const getLocationLabel = (locations) => {
   return active?.location_type || '-';
 };
 
+const needsDetailFetch = (item) => {
+  const firstDetail = item?.service_request_details?.[0];
+  return !firstDetail || !firstDetail.device || !firstDetail.service_type;
+};
+
 const ServiceList = ({ onViewDetail } = {}) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -81,9 +86,6 @@ const ServiceList = ({ onViewDetail } = {}) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const locationsCacheRef = useRef(new Map());
-  const costsCacheRef = useRef(new Map());
-
   useEffect(() => {
     setSearch(querySearch);
   }, [querySearch]);
@@ -91,45 +93,6 @@ const ServiceList = ({ onViewDetail } = {}) => {
   useEffect(() => {
     const controller = new AbortController();
     let cancelled = false;
-
-    const fetchDetail = async (id) => {
-      const detailRes = await authenticatedRequest(`/service-requests/${id}`, {
-        signal: controller.signal,
-      });
-      if (!detailRes.ok) {
-        throw new Error(detailRes.data?.message || 'Failed to fetch service detail');
-      }
-      return normalizeDetailPayload(detailRes.data);
-    };
-
-    const fetchLocations = async (id) => {
-      if (locationsCacheRef.current.has(id)) return locationsCacheRef.current.get(id);
-      const res = await authenticatedRequest(`/service-requests/${id}/locations`, {
-        signal: controller.signal,
-      });
-      if (!res.ok) {
-        locationsCacheRef.current.set(id, []);
-        return [];
-      }
-      const list = normalizeArrayPayload(res.data);
-      locationsCacheRef.current.set(id, list);
-      return list;
-    };
-
-    const fetchCostsTotal = async (id) => {
-      if (costsCacheRef.current.has(id)) return costsCacheRef.current.get(id);
-      const res = await authenticatedRequest(`/service-requests/${id}/costs`, {
-        signal: controller.signal,
-      });
-      if (!res.ok) {
-        costsCacheRef.current.set(id, 0);
-        return 0;
-      }
-      const list = normalizeArrayPayload(res.data);
-      const total = list.reduce((sum, item) => sum + Number(item?.amount || 0), 0);
-      costsCacheRef.current.set(id, total);
-      return total;
-    };
 
     const fetchServices = async () => {
       setIsLoading(true);
@@ -153,12 +116,36 @@ const ServiceList = ({ onViewDetail } = {}) => {
 
         const { items, meta } = normalizeListPayload(response.data);
 
-        const detailIds = items.map((item) => item?.id).filter(Boolean);
-        const details = await Promise.all(detailIds.map((id) => fetchDetail(id)));
+        const baseItems = items.filter((item) => item && item.id);
+
+        const details = await Promise.all(
+          baseItems.map(async (item) => {
+            if (!needsDetailFetch(item)) return normalizeDetailPayload(item);
+            try {
+              return await getServiceRequestDetailCached(item.id, {
+                signal: controller.signal,
+              });
+            } catch (err) {
+              if (err?.name === 'AbortError') return normalizeDetailPayload(item);
+              console.error('Admin service list detail fetch error:', err);
+              return normalizeDetailPayload(item);
+            }
+          })
+        );
+
+        const detailIds = details.map((item) => item?.id).filter(Boolean);
 
         const [locationsList, costsTotals] = await Promise.all([
-          Promise.all(detailIds.map((id) => fetchLocations(id))),
-          Promise.all(detailIds.map((id) => fetchCostsTotal(id))),
+          Promise.all(
+            detailIds.map((id) =>
+              getServiceRequestLocationsCached(id, { signal: controller.signal })
+            )
+          ),
+          Promise.all(
+            detailIds.map((id) =>
+              getServiceRequestCostsTotalCached(id, { signal: controller.signal })
+            )
+          ),
         ]);
 
         const computedRows = details.map((service, index) => {
