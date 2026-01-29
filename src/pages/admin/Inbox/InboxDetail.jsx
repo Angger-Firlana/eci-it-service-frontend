@@ -1,526 +1,722 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import './InboxDetail.css';
 import backIcon from '../../../assets/icons/back.svg';
 import { Modal } from '../../../components/common';
+import { authenticatedRequest, unwrapApiData } from '../../../lib/api';
+import {
+  getCostTypesCached,
+  getStatusMapsCached,
+  getVendorsCached,
+} from '../../../lib/referenceCache';
+import {
+  getServiceRequestDetailCached,
+  getServiceRequestLocationsCached,
+  invalidateServiceRequestCache,
+} from '../../../lib/serviceRequestCache';
 
-const DETAIL_DATA = {
-  code: 'ABCD02',
-  createdAt: 'Dibuat pada tanggal 15 Jan 2026 12:00',
-  department: 'Marketing',
-  requester: 'Toni Apalah',
-  device: 'Laptop',
-  brand: 'Lenovo',
-  model: 'Thinkpad Ideapad',
-  service: 'Hardware',
-  serialNumber: 'KMNT12390LOC',
-  description: 'Keyboard nya rada rusak',
-  servicePlace: 'Bangkit Cell',
-  serviceLocation:
-    'Jl. H. Hasan No.15, RT.3/RW.9, Baru, Kec. Ps. Rebo, Kota Jakarta Timur, Daerah Khusus Ibukota Jakarta 13780',
-  estimateDate: '31/01/2026',
-  moveNote:
-    'Stok barang di workshop dah habis jadi gak bisa lanjut service di sini harus dari luar',
+const formatDateTime = (value) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('id-ID', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 };
 
-const SERVICE_INFO = {
-  vendor: {
-    place: DETAIL_DATA.servicePlace,
-    location: DETAIL_DATA.serviceLocation,
-  },
-  workshop: {
-    place: 'Workshop',
-    location: 'Workshop IT',
-  },
+const formatDateShort = (value) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('id-ID', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
 };
 
-const ESTIMATE_DATA = {
-  cost: 'Rp 300.000',
-  cancelCost: 'Rp 50.000',
-  notes:
-    'Benerin keyboard nya sma abel keyboard baru gara gara yang lama dah babak belur',
+const normalizeArrayPayload = (payload) => {
+  const data = unwrapApiData(payload);
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.data?.data)) return payload.data.data;
+  return [];
 };
 
-const APPROVAL_VARIANTS = {
-  pending: {
-    title: 'Menunggu approval dari atasan',
-    progress: 50,
-    summary: '1/2 Approved',
-    items: [
-      { id: 1, name: 'Pak Ahmad', role: 'IT', status: 'waiting' },
-      { id: 2, name: 'Pak Ahmad', role: 'IT', status: 'approved' },
-    ],
-  },
-  approved: {
-    title: 'Menunggu approval dari atasan',
-    progress: 100,
-    summary: '2/2 Approved',
-    items: [
-      { id: 1, name: 'Pak Ahmad', role: 'IT', status: 'approved' },
-      { id: 2, name: 'Pak Ahmad', role: 'IT', status: 'approved' },
-    ],
-  },
-  rejected: {
-    title: 'Menunggu approval dari atasan',
-    progress: 100,
-    summary: '2/2 Approved',
-    items: [
-      { id: 1, name: 'Pak Ahmad', role: 'IT', status: 'approved' },
-      {
-        id: 2,
-        name: 'Pak Ahmad',
-        role: 'IT',
-        status: 'rejected',
-        note: 'Gaji jelas keterangannya',
-      },
-    ],
-  },
+const getActiveLocation = (locations) => {
+  if (!Array.isArray(locations) || locations.length === 0) return null;
+  return locations.find((l) => l?.is_active) || locations[0] || null;
 };
 
-const TIMELINE_VARIANTS = {
-  approval: [
-    {
-      id: 1,
-      label: 'Menunggu Approval',
-      date: '15 Jan 2026 12:00',
-      note: 'Request dibuat oleh Toni Apalah',
-      state: 'active',
-    },
-  ],
-  workshop: [
-    {
-      id: 1,
-      label: 'Menunggu Approval',
-      date: '15 Jan 2026 12:00',
-      note: 'Request dibuat oleh Toni Apalah',
-      state: 'active',
-    },
-    {
-      id: 2,
-      label: 'Disetujui',
-      date: '17 Jan 2026 12:00',
-      note: 'Disetujui oleh admin dan akan di service di workshop IT',
-      state: 'active',
-    },
-    {
-      id: 3,
-      label: 'Proses',
-      date: '17 Jan 2026 12:00',
-      note: 'Perangkat sedang di service',
-      state: 'active',
-    },
-  ],
-  vendorApproval: [
-    {
-      id: 1,
-      label: 'Menunggu Approval',
-      date: '15 Jan 2026 12:00',
-      note: 'Request dibuat oleh Toni Apalah',
-      state: 'active',
-    },
-    {
-      id: 2,
-      label: 'Disetujui',
-      date: '17 Jan 2026 12:00',
-      note: 'Disetujui oleh admin dan akan di service di vendor',
-      meta: 'Bangkit Cell, Kelurahan Baru',
-      state: 'active',
-    },
-    {
-      id: 3,
-      label: 'Menunggu Approve',
-      date: '20 Jan 2026 12:00',
-      note: 'Menunggu approval biaya Rp 300.000 (biaya cancel Rp 50.000)',
-      meta: '1/2 Approved',
-      state: 'pending',
-    },
-  ],
-  vendorApprovalRejected: [
-    {
-      id: 1,
-      label: 'Menunggu Approval',
-      date: '15 Jan 2026 12:00',
-      note: 'Request dibuat oleh Toni Apalah',
-      state: 'active',
-    },
-    {
-      id: 2,
-      label: 'Disetujui',
-      date: '17 Jan 2026 12:00',
-      note: 'Disetujui oleh admin dan akan di service di vendor',
-      meta: 'Bangkit Cell, Kelurahan Baru',
-      state: 'active',
-    },
-    {
-      id: 3,
-      label: 'Menunggu Approve',
-      date: '20 Jan 2026 12:00',
-      note: 'Menunggu approval biaya Rp 300.000 (biaya cancel Rp 50.000)',
-      meta: '1/2 Approved',
-      state: 'active',
-    },
-    {
-      id: 4,
-      label: 'Ditolak',
-      date: '30 Jan 2026 17:00',
-      note: 'Biaya service ditolak oleh atasan',
-      meta: '2/2 Approved',
-      state: 'rejected',
-    },
-    {
-      id: 5,
-      label: 'Revisi',
-      date: '31 Jan 2026 17:00',
-      note: 'Revisi vendor dikarenakan adanya penolakan dari atasan',
-      state: 'revision',
-    },
-    {
-      id: 6,
-      label: 'Menunggu Approve',
-      date: '1 Feb 2026 12:00',
-      note: 'Menunggu approval biaya Rp 300.000 (biaya cancel Rp 50.000)',
-      meta: '1/2 Approved',
-      state: 'pending',
-    },
-  ],
-  vendorMove: [
-    {
-      id: 1,
-      label: 'Menunggu Approval',
-      date: '15 Jan 2026 12:00',
-      note: 'Request dibuat oleh Toni Apalah',
-      state: 'active',
-    },
-    {
-      id: 2,
-      label: 'Disetujui',
-      date: '17 Jan 2026 12:00',
-      note: 'Disetujui oleh admin dan akan di service di workshop IT',
-      state: 'active',
-    },
-    {
-      id: 3,
-      label: 'Proses',
-      date: '17 Jan 2026 12:00',
-      note: 'Perangkat sedang di service',
-      state: 'active',
-    },
-    {
-      id: 4,
-      label: 'Proses',
-      date: '17 Jan 2026 12:00',
-      note: 'Perangkat dipindahkan ke vendor untuk diservice',
-      state: 'active',
-    },
-    {
-      id: 5,
-      label: 'Menunggu Approve',
-      date: '20 Jan 2026 12:00',
-      note: 'Menunggu approval biaya Rp 300.000 (biaya cancel Rp 50.000)',
-      meta: '1/2 Approved',
-      state: 'pending',
-    },
-  ],
-  vendorProgress: [
-    {
-      id: 1,
-      label: 'Menunggu Approval',
-      date: '15 Jan 2026 12:00',
-      note: 'Request dibuat oleh Toni Apalah',
-      state: 'active',
-    },
-    {
-      id: 2,
-      label: 'Disetujui',
-      date: '17 Jan 2026 12:00',
-      note: 'Disetujui oleh admin dan akan di service di vendor',
-      meta: 'Bangkit Cell, Kelurahan Baru',
-      state: 'active',
-    },
-    {
-      id: 3,
-      label: 'Menunggu Approve',
-      date: '18 Jan 2026 12:00',
-      note: 'Menunggu approval biaya Rp 300.000 (biaya cancel Rp 50.000)',
-      meta: '1/2 Approved',
-      state: 'active',
-    },
-    {
-      id: 4,
-      label: 'Disetujui',
-      date: '18 Jan 2026 17:00',
-      note: 'Biaya service di setujui oleh atasan',
-      meta: '2/2 Approved',
-      state: 'active',
-    },
-    {
-      id: 5,
-      label: 'Service',
-      date: '18 Jan 2026 17:00',
-      note: 'Barang sedang di service di vendor',
-      state: 'active',
-    },
-  ],
-  completed: [
-    {
-      id: 1,
-      label: 'Menunggu Approval',
-      date: '15 Jan 2026 12:00',
-      note: 'Request dibuat oleh Toni Apalah',
-      state: 'active',
-    },
-    {
-      id: 2,
-      label: 'Disetujui',
-      date: '17 Jan 2026 12:00',
-      note: 'Disetujui oleh admin dan akan di service di vendor',
-      meta: 'Bangkit Cell, Kelurahan Baru',
-      state: 'active',
-    },
-    {
-      id: 3,
-      label: 'Menunggu Approve',
-      date: '18 Jan 2026 12:00',
-      note: 'Menunggu approval biaya Rp 300.000 (biaya cancel Rp 50.000)',
-      meta: '1/2 Approved',
-      state: 'active',
-    },
-    {
-      id: 4,
-      label: 'Disetujui',
-      date: '18 Jan 2026 17:00',
-      note: 'Biaya service di setujui oleh atasan',
-      meta: '2/2 Approved',
-      state: 'active',
-    },
-    {
-      id: 5,
-      label: 'Service',
-      date: '18 Jan 2026 17:00',
-      note: 'Barang sedang di service di vendor',
-      state: 'active',
-    },
-    {
-      id: 6,
-      label: 'Selesai',
-      date: '31 Jan 2026 12:00',
-      note: 'Barang selesai di service',
-      state: 'active',
-    },
-  ],
+const getDeviceInfo = (detail) => {
+  const firstDetail = detail?.service_request_details?.[0];
+  const device = firstDetail?.device;
+  const deviceModel = device?.device_model;
+  return {
+    deviceType: device?.device_type?.name || deviceModel?.device_type?.name || '-',
+    brand: deviceModel?.brand || firstDetail?.brand || '-',
+    model: deviceModel?.model || firstDetail?.model || '-',
+    serviceType: firstDetail?.service_type?.name || '-',
+    serialNumber: device?.serial_number || firstDetail?.serial_number || '-',
+    complaint: firstDetail?.complaint || '-',
+  };
 };
 
-const VARIANT_CONFIG = {
-  approval: {
-    actions: ['approval'],
-    showApproval: false,
-    approvalKey: 'pending',
-    showEstimate: false,
-    showServiceFields: false,
-    showNotesReason: false,
-    showInvoice: false,
-    timeline: 'approval',
-  },
-  workshop: {
-    actions: ['move-vendor', 'complete-service'],
-    showApproval: false,
-    approvalKey: 'pending',
-    showEstimate: false,
-    showServiceFields: true,
-    serviceType: 'workshop',
-    showNotesReason: false,
-    showInvoice: false,
-    timeline: 'workshop',
-  },
-  vendorApproval: {
-    actions: ['move-workshop', 'input-cost'],
-    showApproval: true,
-    approvalKey: 'pending',
-    showEstimate: false,
-    showServiceFields: true,
-    showNotesReason: false,
-    showInvoice: false,
-    timeline: 'vendorApproval',
-  },
-  vendorApprovalRejected: {
-    actions: ['move-workshop', 'input-cost'],
-    showApproval: true,
-    approvalKey: 'rejected',
-    showEstimate: false,
-    showServiceFields: true,
-    showNotesReason: false,
-    showInvoice: false,
-    timeline: 'vendorApprovalRejected',
-  },
-  vendorMove: {
-    actions: ['move-workshop', 'input-cost'],
-    showApproval: true,
-    approvalKey: 'pending',
-    showEstimate: false,
-    showServiceFields: true,
-    showNotesReason: true,
-    showInvoice: true,
-    timeline: 'vendorMove',
-  },
-  vendorProgress: {
-    actions: ['complete-service'],
-    showApproval: true,
-    approvalKey: 'approved',
-    showEstimate: true,
-    showServiceFields: true,
-    showNotesReason: false,
-    showInvoice: true,
-    timeline: 'vendorProgress',
-  },
-  vendorReassign: {
-    actions: ['complete-service', 'reschedule-vendor'],
-    showApproval: true,
-    approvalKey: 'rejected',
-    showEstimate: true,
-    showServiceFields: true,
-    showNotesReason: false,
-    showInvoice: true,
-    timeline: 'vendorProgress',
-  },
-  completed: {
-    actions: ['complete-service'],
-    showApproval: true,
-    approvalKey: 'approved',
-    showEstimate: true,
-    showServiceFields: true,
-    showNotesReason: false,
-    showInvoice: true,
-    timeline: 'completed',
-  },
+const getErrorMessage = (payload, fallback) => {
+  if (!payload) return fallback;
+  if (typeof payload?.message === 'string' && payload.message) return payload.message;
+  if (payload?.errors && typeof payload.errors === 'object') {
+    const lines = [];
+    for (const [key, value] of Object.entries(payload.errors)) {
+      lines.push(`${key}: ${Array.isArray(value) ? value.join(', ') : String(value)}`);
+    }
+    if (lines.length) return lines.join('\n');
+  }
+  return fallback;
 };
 
-const AdminInboxDetail = ({ onBack, variant = 'approval' } = {}) => {
-  const [locationType, setLocationType] = useState('workshop');
+const parseCurrencyNumber = (value) => {
+  if (value === null || value === undefined) return 0;
+  const digits = String(value).replace(/[^0-9]/g, '');
+  return digits ? Number(digits) : 0;
+};
+
+const AdminInboxDetail = ({ onBack } = {}) => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+
+  const [detail, setDetail] = useState(null);
+  const [locations, setLocations] = useState([]);
+  const [costs, setCosts] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [costTypes, setCostTypes] = useState([]);
+  const [serviceStatusById, setServiceStatusById] = useState(new Map());
+  const [serviceStatusByCode, setServiceStatusByCode] = useState(new Map());
+  const [allStatusById, setAllStatusById] = useState(new Map());
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const [actionNote, setActionNote] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
   const [isLocationModalOpen, setLocationModalOpen] = useState(false);
-  const [isMoveModalOpen, setMoveModalOpen] = useState(false);
-  const [isCostModalOpen, setCostModalOpen] = useState(false);
+  const [locationType, setLocationType] = useState('internal');
+  const [locationForm, setLocationForm] = useState({
+    estimatedDate: '',
+    vendorId: '',
+    address: '',
+    city: '',
+    province: '',
+    postalCode: '',
+    mapsUrl: '',
+    serviceFee: '',
+    cancellationFee: '',
+    costNotes: '',
+  });
+  const [locationError, setLocationError] = useState('');
+
   const [isApprovalModalOpen, setApprovalModalOpen] = useState(false);
+  const [approverOptions, setApproverOptions] = useState([]);
+  const [selectedApprovers, setSelectedApprovers] = useState(new Set());
+  const [approvalError, setApprovalError] = useState('');
+  const [pendingVendorSubmit, setPendingVendorSubmit] = useState(null);
 
-  const config = VARIANT_CONFIG[variant] || VARIANT_CONFIG.approval;
-  const serviceInfo = SERVICE_INFO[config.serviceType || 'vendor'];
-  const timelineItems = TIMELINE_VARIANTS[config.timeline] || [];
-  const approvalData = APPROVAL_VARIANTS[config.approvalKey] || APPROVAL_VARIANTS.pending;
+  const refresh = async () => {
+    if (!id) return;
+    setIsLoading(true);
+    setError('');
+    try {
+      const [detailData, locationsData] = await Promise.all([
+        getServiceRequestDetailCached(id),
+        getServiceRequestLocationsCached(id),
+      ]);
 
-  const actions = useMemo(() => config.actions || [], [config.actions]);
+      const costsRes = await authenticatedRequest(`/service-requests/${id}/costs`);
+      const costsData = costsRes.ok ? normalizeArrayPayload(costsRes.data) : [];
 
-  const renderAction = (action) => {
-    switch (action) {
-      case 'approval':
-        return (
-          <section className="admin-action-card" key={action}>
-            <h2>Aksi</h2>
-            <label className="admin-action-label">Estimasi tanggal selesai</label>
-            <div className="admin-action-input">
-              <input type="text" placeholder="mm/dd/yyyy" />
-              <i className="bi bi-calendar3"></i>
-            </div>
-            <div className="admin-action-buttons">
-              <button className="admin-action-reject" type="button">
-                Reject
-              </button>
-              <button
-                className="admin-action-approve"
-                type="button"
-                onClick={() => setLocationModalOpen(true)}
-              >
-                Approve
-              </button>
-            </div>
-          </section>
-        );
-      case 'move-vendor':
-        return (
-          <section className="admin-action-card" key={action}>
-            <h2>Pindah Ke Vendor</h2>
-            <button
-              className="admin-action-primary"
-              type="button"
-              onClick={() => setMoveModalOpen(true)}
-            >
-              <i className="bi bi-geo-alt"></i>
-              Pindah Vendor
-            </button>
-          </section>
-        );
-      case 'move-workshop':
-        return (
-          <section className="admin-action-card" key={action}>
-            <h2>Pindah Ke Workshop</h2>
-            <button
-              className="admin-action-primary"
-              type="button"
-              onClick={() => setMoveModalOpen(true)}
-            >
-              <i className="bi bi-geo-alt"></i>
-              Pindah Workshop
-            </button>
-          </section>
-        );
-      case 'input-cost':
-        return (
-          <section className="admin-action-card" key={action}>
-            <h2>Input Biaya Service</h2>
-            <p>Masukkan estimasi biaya service di vendor</p>
-            <button
-              className="admin-action-primary"
-              type="button"
-              onClick={() => setCostModalOpen(true)}
-            >
-              <i className="bi bi-cash-stack"></i>
-              Input biaya
-            </button>
-          </section>
-        );
-      case 'complete-service':
-        return (
-          <section className="admin-action-card" key={action}>
-            <h2>Selesaikan Service</h2>
-            <button className="admin-action-primary" type="button">
-              <i className="bi bi-check-circle"></i>
-              Tandai Selesai
-            </button>
-          </section>
-        );
-      case 'reschedule-vendor':
-        return (
-          <section className="admin-action-card" key={action}>
-            <h2>Atur Ulang Vendor</h2>
-            <button
-              className="admin-action-primary"
-              type="button"
-              onClick={() => setMoveModalOpen(true)}
-            >
-              <i className="bi bi-geo-alt"></i>
-              Atur Ulang
-            </button>
-          </section>
-        );
-      default:
-        return null;
+      setDetail(detailData);
+      setLocations(Array.isArray(locationsData) ? locationsData : []);
+      setCosts(costsData);
+    } catch (err) {
+      setDetail(null);
+      setLocations([]);
+      setCosts([]);
+      setError(err.message || 'Gagal memuat detail request');
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    let mounted = true;
+
+    const init = async () => {
+      try {
+        const [allStatuses, serviceStatuses, vendorsList, costTypeList] =
+          await Promise.all([
+            getStatusMapsCached(),
+            getStatusMapsCached({ entityTypeId: 1 }),
+            getVendorsCached(),
+            getCostTypesCached(),
+          ]);
+        if (!mounted) return;
+
+        setAllStatusById(allStatuses.byId);
+        setServiceStatusById(serviceStatuses.byId);
+        setServiceStatusByCode(serviceStatuses.byCode);
+        setVendors(Array.isArray(vendorsList) ? vendorsList : []);
+        setCostTypes(Array.isArray(costTypeList) ? costTypeList : []);
+      } catch (err) {
+        if (!mounted) return;
+        setError(err.message || 'Gagal memuat referensi');
+      }
+    };
+
+    init();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  const serviceStatus = useMemo(() => {
+    if (!detail) return null;
+    return serviceStatusById.get(Number(detail.status_id)) || null;
+  }, [detail, serviceStatusById]);
+
+  const serviceStatusCode = serviceStatus?.code || '';
+  const needsAdminApprove =
+    serviceStatusCode === 'PENDING' || serviceStatusCode === 'IN_REVIEW_ADMIN';
+  const needsLocationSet = serviceStatusCode === 'APPROVED_BY_ADMIN';
+
+  const activeLocation = useMemo(
+    () => getActiveLocation(locations),
+    [locations]
+  );
+
+  const deviceInfo = useMemo(() => getDeviceInfo(detail), [detail]);
+
+  const departmentLabel =
+    detail?.user?.departments?.[0]?.name || detail?.user?.department?.name || '-';
+
+  const vendorOptionById = useMemo(() => {
+    const map = new Map();
+    for (const vendor of vendors) {
+      if (!vendor?.id) continue;
+      map.set(String(vendor.id), vendor);
+    }
+    return map;
+  }, [vendors]);
+
+  const costTypeByCode = useMemo(() => {
+    const map = new Map();
+    for (const ct of costTypes) {
+      if (ct?.code) map.set(String(ct.code), ct);
+    }
+    return map;
+  }, [costTypes]);
+
+  const existingCostsByCode = useMemo(() => {
+    const map = new Map();
+    for (const cost of costs) {
+      const code = cost?.cost_type?.code;
+      if (code) map.set(String(code), cost);
+    }
+    return map;
+  }, [costs]);
+
+  const vendorApprovals = Array.isArray(detail?.vendor_approvals)
+    ? detail.vendor_approvals
+    : [];
+
+  const approvalSummary = useMemo(() => {
+    const total = vendorApprovals.length;
+    if (!total) return null;
+
+    let approved = 0;
+    let rejected = 0;
+
+    for (const item of vendorApprovals) {
+      const statusInfo = allStatusById.get(Number(item?.status_id));
+      const code = statusInfo?.code || '';
+      if (code === 'APPROVED') approved += 1;
+      if (code === 'REJECTED') rejected += 1;
+    }
+
+    const progress = total ? Math.round((approved / total) * 100) : 0;
+    return {
+      total,
+      approved,
+      rejected,
+      progress,
+      summary: `${approved}/${total} Approved`,
+    };
+  }, [allStatusById, vendorApprovals]);
+
+  const timelineItems = useMemo(() => {
+    const logs = Array.isArray(detail?.audit_logs) ? [...detail.audit_logs] : [];
+    logs.sort((a, b) => {
+      const aTime = new Date(a?.created_at || 0).getTime();
+      const bTime = new Date(b?.created_at || 0).getTime();
+      return aTime - bTime;
+    });
+
+    return logs.map((log) => {
+      const newStatus =
+        log?.new_status_id != null
+          ? allStatusById.get(Number(log.new_status_id))
+          : null;
+
+      const actorName = log?.actor?.name || 'Unknown';
+
+      let label = newStatus?.name || log?.action || 'Update';
+      let note = log?.notes || '-';
+
+      if (log?.action === 'CREATE_REQUEST') {
+        label = newStatus?.name || 'Request dibuat';
+        note = `Request dibuat oleh ${actorName}`;
+      }
+
+      if (log?.action === 'APPROVE_VENDOR') {
+        label = 'Approval Atasan';
+        note = `Disetujui oleh ${actorName}`;
+      }
+
+      if (log?.action === 'UPDATE_VENDOR_APPROVAL') {
+        label = 'Approval Atasan';
+      }
+
+      return {
+        id: log?.id || `${log?.action}-${log?.created_at}`,
+        label,
+        date: formatDateTime(log?.created_at),
+        note,
+        state: 'active',
+      };
+    });
+  }, [allStatusById, detail?.audit_logs]);
+
+  const setLocationFormValue = (field) => (event) => {
+    const value = event?.target?.value;
+    setLocationForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const openLocationModal = () => {
+    setLocationError('');
+
+    const nextType =
+      activeLocation?.location_type === 'external' ? 'external' : 'internal';
+
+    const serviceFee = existingCostsByCode.get('SERVICE_FEE')?.amount;
+    const cancellationFee = existingCostsByCode.get('CANCELLATION')?.amount;
+
+    setLocationType(nextType);
+    setLocationForm({
+      estimatedDate: detail?.estimated_date
+        ? String(detail.estimated_date).slice(0, 10)
+        : '',
+      vendorId: activeLocation?.vendor_id ? String(activeLocation.vendor_id) : '',
+      address: activeLocation?.address || '',
+      city: activeLocation?.city || '',
+      province: activeLocation?.province || '',
+      postalCode: activeLocation?.postal_code || '',
+      mapsUrl: activeLocation?.maps_url || '',
+      serviceFee: serviceFee != null ? String(serviceFee) : '',
+      cancellationFee: cancellationFee != null ? String(cancellationFee) : '',
+      costNotes: '',
+    });
+    setLocationModalOpen(true);
+  };
+
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+    navigate('/inbox');
+  };
+
+  const handleAdminApprove = async () => {
+    if (!id) return;
+    setIsSaving(true);
+    setError('');
+    try {
+      const res = await authenticatedRequest(`/service-requests/approved-by-admin/${id}`, {
+        method: 'POST',
+        body: actionNote.trim() ? { log_notes: actionNote.trim() } : undefined,
+      });
+      if (!res.ok) {
+        throw new Error(getErrorMessage(res.data, 'Gagal approve request'));
+      }
+
+      // The backend approve-by-admin endpoint doesn't emit a status audit log.
+      // Add a timeline entry via PUT (without changing status).
+      await authenticatedRequest(`/service-requests/${id}`, {
+        method: 'PUT',
+        body: {
+          log_notes: actionNote.trim() || 'Request di-approve oleh admin',
+        },
+      });
+
+      invalidateServiceRequestCache(id);
+      await refresh();
+      setActionNote('');
+      setLocationModalOpen(true);
+    } catch (err) {
+      setError(err.message || 'Gagal approve request');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAdminReject = async () => {
+    if (!id) return;
+    const rejectedId = serviceStatusByCode.get('REJECTED')?.id;
+    if (!rejectedId) {
+      setError('Status REJECTED tidak ditemukan');
+      return;
+    }
+
+    setIsSaving(true);
+    setError('');
+    try {
+      const res = await authenticatedRequest(`/service-requests/${id}`, {
+        method: 'PUT',
+        body: {
+          status_id: Number(rejectedId),
+          log_notes: actionNote.trim() || 'Request ditolak oleh admin',
+        },
+      });
+      if (!res.ok) {
+        throw new Error(getErrorMessage(res.data, 'Gagal reject request'));
+      }
+
+      invalidateServiceRequestCache(id);
+      await refresh();
+      setActionNote('');
+    } catch (err) {
+      setError(err.message || 'Gagal reject request');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const upsertCost = async (serviceRequestId, costTypeCode, amount, description) => {
+    const costType = costTypeByCode.get(costTypeCode);
+    if (!costType?.id) {
+      throw new Error(`Cost type ${costTypeCode} tidak ditemukan`);
+    }
+
+    const existing = existingCostsByCode.get(costTypeCode);
+    const payload = {
+      cost_type_id: Number(costType.id),
+      amount: Number(amount),
+      description: description || null,
+    };
+
+    if (existing?.id) {
+      const res = await authenticatedRequest(
+        `/service-requests/${serviceRequestId}/costs/${existing.id}`,
+        {
+          method: 'PUT',
+          body: payload,
+        }
+      );
+      if (!res.ok) {
+        throw new Error(getErrorMessage(res.data, 'Gagal update biaya'));
+      }
+      return;
+    }
+
+    const res = await authenticatedRequest(`/service-requests/${serviceRequestId}/costs`, {
+      method: 'POST',
+      body: payload,
+    });
+    if (!res.ok) {
+      throw new Error(getErrorMessage(res.data, 'Gagal tambah biaya'));
+    }
+  };
+
+  const fetchApproverOptions = async (serviceRequestId) => {
+    const res = await authenticatedRequest(`/service-requests/${serviceRequestId}/approver`);
+    if (!res.ok) {
+      throw new Error(getErrorMessage(res.data, 'Gagal memuat list atasan'));
+    }
+    const data = unwrapApiData(res.data) || {};
+    const list = Array.isArray(data?.approvers) ? data.approvers : [];
+    return { list, raw: data };
+  };
+
+  const handleSaveLocation = async () => {
+    if (!id) return;
+    setLocationError('');
+    setIsSaving(true);
+
+    try {
+      const estimatedDate = String(locationForm.estimatedDate || '').trim();
+      if (!estimatedDate) {
+        throw new Error('Estimasi tanggal selesai wajib diisi');
+      }
+
+      if (locationType === 'internal') {
+        const locationRes = await authenticatedRequest(`/service-requests/${id}/locations`, {
+          method: 'POST',
+          body: {
+            location_type: 'internal',
+            is_active: true,
+          },
+        });
+
+        if (!locationRes.ok) {
+          throw new Error(getErrorMessage(locationRes.data, 'Gagal set lokasi workshop'));
+        }
+
+        const inProgressId = serviceStatusByCode.get('IN_PROGRESS')?.id;
+        if (!inProgressId) {
+          throw new Error('Status IN_PROGRESS tidak ditemukan');
+        }
+
+        const updateRes = await authenticatedRequest(`/service-requests/${id}`, {
+          method: 'PUT',
+          body: {
+            status_id: Number(inProgressId),
+            estimated_date: estimatedDate,
+            log_notes: 'Diset ke workshop (internal)',
+          },
+        });
+        if (!updateRes.ok) {
+          throw new Error(getErrorMessage(updateRes.data, 'Gagal update status'));
+        }
+
+        setLocationModalOpen(false);
+        invalidateServiceRequestCache(id);
+        await refresh();
+        return;
+      }
+
+      // External vendor path
+      const vendorId = String(locationForm.vendorId || '').trim();
+      if (!vendorId) {
+        throw new Error('Vendor wajib dipilih');
+      }
+
+      const address = String(locationForm.address || '').trim();
+      const city = String(locationForm.city || '').trim();
+      const province = String(locationForm.province || '').trim();
+      const postalCode = String(locationForm.postalCode || '').trim();
+      const mapsUrl = String(locationForm.mapsUrl || '').trim();
+      if (!address || !city || !province || !postalCode || !mapsUrl) {
+        throw new Error('Alamat vendor harus lengkap (alamat, kota, provinsi, kode pos, link maps)');
+      }
+
+      const fee = parseCurrencyNumber(locationForm.serviceFee);
+      const cancelFee = parseCurrencyNumber(locationForm.cancellationFee);
+      if (!fee) {
+        throw new Error('Biaya service wajib diisi');
+      }
+
+      const locationRes = await authenticatedRequest(`/service-requests/${id}/locations`, {
+        method: 'POST',
+        body: {
+          location_type: 'external',
+          vendor_id: Number(vendorId),
+          address,
+          city,
+          province,
+          postal_code: postalCode,
+          maps_url: mapsUrl,
+          is_active: true,
+        },
+      });
+      if (!locationRes.ok) {
+        throw new Error(getErrorMessage(locationRes.data, 'Gagal set lokasi vendor'));
+      }
+
+      await upsertCost(id, 'SERVICE_FEE', fee, locationForm.costNotes);
+      if (cancelFee) {
+        await upsertCost(id, 'CANCELLATION', cancelFee, locationForm.costNotes);
+      }
+
+      const { list: approvers } = await fetchApproverOptions(id);
+      if (!approvers.length) {
+        throw new Error('Tidak ada atasan tersedia untuk approval');
+      }
+
+      setApproverOptions(approvers);
+      setSelectedApprovers((prev) => {
+        if (prev.size) return prev;
+        const next = new Set();
+        const pickCount = Math.min(2, approvers.length);
+        for (let i = 0; i < pickCount; i += 1) {
+          if (approvers[i]?.id) next.add(String(approvers[i].id));
+        }
+        return next;
+      });
+      setPendingVendorSubmit({
+        estimatedDate,
+        logNotes: locationForm.costNotes,
+      });
+
+      setLocationModalOpen(false);
+      setApprovalError('');
+      setApprovalModalOpen(true);
+    } catch (err) {
+      setLocationError(err.message || 'Gagal menyimpan lokasi');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const toggleApprover = (approverId) => {
+    setSelectedApprovers((prev) => {
+      const next = new Set(prev);
+      if (next.has(approverId)) next.delete(approverId);
+      else next.add(approverId);
+      return next;
+    });
+  };
+
+  const handleSaveApprovers = async () => {
+    if (!id) return;
+    setApprovalError('');
+    setIsSaving(true);
+
+    try {
+      const approvers = Array.from(selectedApprovers)
+        .map((v) => Number(v))
+        .filter(Boolean);
+
+      if (!approvers.length) {
+        throw new Error('Pilih minimal 1 atasan');
+      }
+
+      const hasExisting = Array.isArray(detail?.vendor_approvals) && detail.vendor_approvals.length > 0;
+      const method = hasExisting ? 'PUT' : 'POST';
+
+      const res = await authenticatedRequest(`/service-requests/${id}/approvals`, {
+        method,
+        body: { approvers },
+      });
+      if (!res.ok) {
+        throw new Error(getErrorMessage(res.data, 'Gagal menyimpan approval atasan'));
+      }
+
+      const inReviewAboveId = serviceStatusByCode.get('IN_REVIEW_ABOVE')?.id;
+      if (!inReviewAboveId) {
+        throw new Error('Status IN_REVIEW_ABOVE tidak ditemukan');
+      }
+
+      const updateRes = await authenticatedRequest(`/service-requests/${id}`, {
+        method: 'PUT',
+        body: {
+          status_id: Number(inReviewAboveId),
+          estimated_date: pendingVendorSubmit?.estimatedDate,
+          log_notes:
+            pendingVendorSubmit?.logNotes || 'Menunggu approval atasan (vendor)',
+        },
+      });
+      if (!updateRes.ok) {
+        throw new Error(getErrorMessage(updateRes.data, 'Gagal update status'));
+      }
+
+      setApprovalModalOpen(false);
+      setPendingVendorSubmit(null);
+
+      invalidateServiceRequestCache(id);
+      await refresh();
+    } catch (err) {
+      setApprovalError(err.message || 'Gagal menyimpan approval');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="admin-inbox-detail">
+        <div className="admin-detail-loading">Loading...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="admin-inbox-detail">
+        <div className="admin-detail-error">
+          <p>{error}</p>
+          <button type="button" onClick={handleBack}>
+            Kembali
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!detail) {
+    return (
+      <div className="admin-inbox-detail">
+        <div className="admin-detail-error">
+          <p>Request tidak ditemukan</p>
+          <button type="button" onClick={handleBack}>
+            Kembali
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const serviceNumber = detail.service_number || `SR-${detail.id}`;
+  const createdAt = formatDateTime(detail.request_date || detail.created_at);
+
+  const vendorLabel = activeLocation?.vendor?.name
+    ? activeLocation.vendor.name
+    : activeLocation?.vendor_id
+      ? vendorOptionById.get(String(activeLocation.vendor_id))?.name
+      : '';
+
+  const placeLabel =
+    activeLocation?.location_type === 'external'
+      ? vendorLabel || 'Vendor'
+      : activeLocation
+        ? 'Workshop IT'
+        : '-';
+
+  const addressLabel =
+    activeLocation?.location_type === 'external'
+      ? [
+          activeLocation?.address,
+          activeLocation?.city,
+          activeLocation?.province,
+          activeLocation?.postal_code,
+        ]
+          .filter(Boolean)
+          .join(', ')
+      : activeLocation
+        ? 'Workshop IT'
+        : '-';
 
   return (
     <div className="admin-inbox-detail">
       <div className="admin-detail-header">
-        <button
-          className="admin-detail-back"
-          type="button"
-          onClick={() => onBack?.()}
-        >
+        <button className="admin-detail-back" type="button" onClick={handleBack}>
           <img src={backIcon} alt="Back" />
         </button>
         <div className="admin-detail-title">
-          <h1>{DETAIL_DATA.code}</h1>
-          <p>{DETAIL_DATA.createdAt}</p>
+          <h1>{serviceNumber}</h1>
+          <p>Dibuat pada tanggal {createdAt}</p>
         </div>
-        <button className="admin-cancel-btn" type="button">
-          Batalkan Service
-        </button>
       </div>
 
       <div className="admin-inbox-grid">
@@ -528,116 +724,150 @@ const AdminInboxDetail = ({ onBack, variant = 'approval' } = {}) => {
           <section className="admin-detail-card">
             <div className="admin-detail-card-head">
               <h2>Detail Request</h2>
-              <span className="admin-detail-dept">{DETAIL_DATA.department}</span>
+              <span className="admin-detail-dept">{departmentLabel}</span>
             </div>
 
             <div className="admin-detail-row">
               <span className="admin-detail-key">Requester</span>
-              <span className="admin-detail-value">{DETAIL_DATA.requester}</span>
+              <span className="admin-detail-value">{detail.user?.name || '-'}</span>
             </div>
             <div className="admin-detail-row">
               <span className="admin-detail-key">Perangkat</span>
-              <span className="admin-detail-value">{DETAIL_DATA.device}</span>
+              <span className="admin-detail-value">{deviceInfo.deviceType}</span>
             </div>
             <div className="admin-detail-row">
               <span className="admin-detail-key">Merk</span>
-              <span className="admin-detail-value">{DETAIL_DATA.brand}</span>
+              <span className="admin-detail-value">{deviceInfo.brand}</span>
             </div>
             <div className="admin-detail-row">
               <span className="admin-detail-key">Model</span>
-              <span className="admin-detail-value">{DETAIL_DATA.model}</span>
+              <span className="admin-detail-value">{deviceInfo.model}</span>
             </div>
             <div className="admin-detail-row">
               <span className="admin-detail-key">Jenis Service</span>
-              <span className="admin-detail-value">{DETAIL_DATA.service}</span>
+              <span className="admin-detail-value">{deviceInfo.serviceType}</span>
             </div>
             <div className="admin-detail-row">
               <span className="admin-detail-key">Serial Number</span>
-              <span className="admin-detail-value">{DETAIL_DATA.serialNumber}</span>
+              <span className="admin-detail-value">{deviceInfo.serialNumber}</span>
             </div>
 
             <div className="admin-detail-notes">
               <span className="admin-detail-key">Keterangan</span>
-              <div className="admin-detail-text">{DETAIL_DATA.description}</div>
+              <div className="admin-detail-text">{deviceInfo.complaint}</div>
             </div>
 
-            {config.showServiceFields && (
+            <div className="admin-detail-row">
+              <span className="admin-detail-key">Status</span>
+              <span className="admin-detail-value">{serviceStatus?.name || '-'}</span>
+            </div>
+
+            {activeLocation && (
               <>
                 <div className="admin-detail-row">
                   <span className="admin-detail-key">Tempat service</span>
-                  <span className="admin-detail-value">
-                    {serviceInfo.place}
-                  </span>
-                  <button className="admin-detail-edit" type="button">
-                    <i className="bi bi-pencil"></i>
-                  </button>
+                  <span className="admin-detail-value">{placeLabel}</span>
                 </div>
 
                 <div className="admin-detail-location">
                   <div className="admin-detail-location-head">
                     <span className="admin-detail-key">Lokasi Service</span>
-                    <button className="admin-detail-edit" type="button">
-                      <i className="bi bi-pencil"></i>
-                    </button>
                   </div>
-                  <div className="admin-detail-address">
-                    {serviceInfo.location}
-                  </div>
-                </div>
-
-                <div className="admin-detail-row">
-                  <span className="admin-detail-key">Estimasi Selesai</span>
-                  <span className="admin-detail-value">
-                    {DETAIL_DATA.estimateDate}
-                  </span>
-                  <button className="admin-detail-edit" type="button">
-                    <i className="bi bi-pencil"></i>
-                  </button>
+                  <div className="admin-detail-address">{addressLabel || '-'}</div>
                 </div>
               </>
             )}
 
-            {config.showNotesReason && (
-              <div className="admin-detail-notes">
-                <span className="admin-detail-key">Keterangan</span>
-                <div className="admin-detail-text">{DETAIL_DATA.moveNote}</div>
+            {detail.estimated_date && (
+              <div className="admin-detail-row">
+                <span className="admin-detail-key">Estimasi Selesai</span>
+                <span className="admin-detail-value">
+                  {formatDateShort(detail.estimated_date)}
+                </span>
               </div>
             )}
           </section>
-
-          {config.showEstimate && (
-            <section className="admin-estimate-card">
-              <h2>Estimasi Biaya</h2>
-              <div className="admin-estimate-row">
-                <span>Biaya</span>
-                <span>{ESTIMATE_DATA.cost}</span>
-              </div>
-              <div className="admin-estimate-row">
-                <span>Biaya Cancel</span>
-                <span>{ESTIMATE_DATA.cancelCost}</span>
-              </div>
-              <div className="admin-estimate-notes">
-                <span className="admin-detail-key">Keterangan Service</span>
-                <div className="admin-detail-text">{ESTIMATE_DATA.notes}</div>
-              </div>
-            </section>
-          )}
         </div>
 
         <div className="admin-inbox-right">
-          {actions.map((action) => renderAction(action))}
+          {needsAdminApprove && (
+            <section className="admin-action-card">
+              <h2>Aksi</h2>
+              <label className="admin-action-label" htmlFor="admin-action-note">
+                Keterangan (opsional)
+              </label>
+              <textarea
+                id="admin-action-note"
+                className="admin-action-textarea"
+                rows={4}
+                value={actionNote}
+                onChange={(event) => setActionNote(event.target.value)}
+              />
 
-          {config.showApproval && (
+              <div className="admin-action-buttons">
+                <button
+                  className="admin-action-reject"
+                  type="button"
+                  onClick={handleAdminReject}
+                  disabled={isSaving}
+                >
+                  Reject
+                </button>
+                <button
+                  className="admin-action-approve"
+                  type="button"
+                  onClick={handleAdminApprove}
+                  disabled={isSaving}
+                >
+                  Approve
+                </button>
+              </div>
+            </section>
+          )}
+
+          {needsLocationSet && (
+            <section className="admin-action-card">
+              <h2>Set Lokasi Service</h2>
+              <button
+                className="admin-action-primary"
+                type="button"
+                onClick={openLocationModal}
+              >
+                <i className="bi bi-geo-alt"></i>
+                Set Lokasi
+              </button>
+            </section>
+          )}
+
+          {vendorApprovals.length > 0 && approvalSummary && (
             <section className="admin-approval-card">
               <div className="admin-approval-head">
                 <div>
                   <h2>Status Approval</h2>
-                  <p>{approvalData.title}</p>
+                  <p>Menunggu approval dari atasan</p>
                 </div>
                 <button
                   className="admin-detail-edit"
                   type="button"
-                  onClick={() => setApprovalModalOpen(true)}
+                  onClick={async () => {
+                    setApprovalError('');
+                    try {
+                      const { list: approvers } = await fetchApproverOptions(id);
+                      setApproverOptions(approvers);
+                      setSelectedApprovers(
+                        new Set(vendorApprovals.map((a) => String(a.approver_id)).filter(Boolean))
+                      );
+                      setPendingVendorSubmit({
+                        estimatedDate: detail?.estimated_date
+                          ? String(detail.estimated_date).slice(0, 10)
+                          : null,
+                        logNotes: 'Update approval atasan',
+                      });
+                      setApprovalModalOpen(true);
+                    } catch (err) {
+                      setError(err.message || 'Gagal memuat atasan');
+                    }
+                  }}
                 >
                   <i className="bi bi-pencil"></i>
                 </button>
@@ -647,36 +877,46 @@ const AdminInboxDetail = ({ onBack, variant = 'approval' } = {}) => {
                 <div className="admin-approval-bar">
                   <span
                     className="admin-approval-bar-fill"
-                    style={{ width: `${approvalData.progress}%` }}
+                    style={{ width: `${approvalSummary.progress}%` }}
                   ></span>
                 </div>
-                <span className="admin-approval-count">{approvalData.summary}</span>
+                <span className="admin-approval-count">{approvalSummary.summary}</span>
               </div>
 
               <div className="admin-approval-list">
-                {approvalData.items.map((item) => (
-                  <div
-                    className={`admin-approval-item admin-approval-${item.status}`}
-                    key={item.id}
-                  >
-                    <div>
-                      <div className="admin-approval-name">{item.name}</div>
-                      {item.role && (
-                        <div className="admin-approval-role">{item.role}</div>
-                      )}
-                      {item.note && (
-                        <div className="admin-approval-note">{item.note}</div>
-                      )}
-                    </div>
-                    <span className="admin-approval-status">
-                      {item.status === 'waiting'
-                        ? 'Waiting'
-                        : item.status === 'rejected'
+                {vendorApprovals.map((item) => {
+                  const statusInfo = allStatusById.get(Number(item?.status_id));
+                  const statusCode = statusInfo?.code || '';
+                  const state =
+                    statusCode === 'APPROVED'
+                      ? 'approved'
+                      : statusCode === 'REJECTED'
+                        ? 'rejected'
+                        : 'waiting';
+                  const statusLabel =
+                    state === 'approved'
+                      ? 'Approved'
+                      : state === 'rejected'
                         ? 'Unapprove'
-                        : 'Approved'}
-                    </span>
-                  </div>
-                ))}
+                        : 'Waiting';
+
+                  return (
+                    <div
+                      className={`admin-approval-item admin-approval-${state}`}
+                      key={item.id}
+                    >
+                      <div>
+                        <div className="admin-approval-name">
+                          {item.approver?.name || '-'}
+                        </div>
+                        {item.notes && (
+                          <div className="admin-approval-note">{item.notes}</div>
+                        )}
+                      </div>
+                      <span className="admin-approval-status">{statusLabel}</span>
+                    </div>
+                  );
+                })}
               </div>
             </section>
           )}
@@ -684,38 +924,28 @@ const AdminInboxDetail = ({ onBack, variant = 'approval' } = {}) => {
           <section className="admin-timeline-card">
             <h2>Timeline</h2>
             <div className="admin-timeline-list">
-              {timelineItems.map((item, index) => (
-                <div className="admin-timeline-item" key={item.id}>
-                  <div className="admin-timeline-marker">
-                    <span className={`admin-timeline-dot ${item.state}`}></span>
-                    {index < timelineItems.length - 1 && (
-                      <span
-                        className={`admin-timeline-line ${item.state}`}
-                      ></span>
-                    )}
+              {timelineItems.length === 0 ? (
+                <div className="admin-timeline-empty">Belum ada aktivitas</div>
+              ) : (
+                timelineItems.map((item, index) => (
+                  <div className="admin-timeline-item" key={item.id}>
+                    <div className="admin-timeline-marker">
+                      <span className={`admin-timeline-dot ${item.state}`}></span>
+                      {index < timelineItems.length - 1 && (
+                        <span className={`admin-timeline-line ${item.state}`}></span>
+                      )}
+                    </div>
+                    <div className="admin-timeline-content">
+                      <span className={`admin-timeline-tag ${item.state || 'active'}`}>
+                        {item.label}
+                      </span>
+                      <span className="admin-timeline-date">{item.date}</span>
+                      <span className="admin-timeline-desc">{item.note}</span>
+                    </div>
                   </div>
-                  <div className="admin-timeline-content">
-                    <span
-                      className={`admin-timeline-tag ${item.state || 'active'}`}
-                    >
-                      {item.label}
-                    </span>
-                    <span className="admin-timeline-date">{item.date}</span>
-                    <span className="admin-timeline-desc">{item.note}</span>
-                    {item.meta && (
-                      <span className="admin-timeline-meta">{item.meta}</span>
-                    )}
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
-
-            {config.showInvoice && (
-              <button className="admin-invoice-btn" type="button">
-                Cetak Invoice
-                <i className="bi bi-printer"></i>
-              </button>
-            )}
           </section>
         </div>
       </div>
@@ -733,22 +963,24 @@ const AdminInboxDetail = ({ onBack, variant = 'approval' } = {}) => {
           <i className="bi bi-x"></i>
         </button>
         <h2>Pilih Lokasi Service</h2>
-        <p>Tambahkan lokasi service ...</p>
+        <p>Set lokasi service dan estimasi tanggal selesai</p>
+
+        {locationError && <div className="admin-modal-error">{locationError}</div>}
 
         <div className="admin-modal-options">
           <label className="admin-modal-option">
             <input
               type="radio"
-              checked={locationType === 'workshop'}
-              onChange={() => setLocationType('workshop')}
+              checked={locationType === 'internal'}
+              onChange={() => setLocationType('internal')}
             />
             Workshop IT (Internal)
           </label>
           <label className="admin-modal-option">
             <input
               type="radio"
-              checked={locationType === 'vendor'}
-              onChange={() => setLocationType('vendor')}
+              checked={locationType === 'external'}
+              onChange={() => setLocationType('external')}
             />
             Vendor (Eksternal)
           </label>
@@ -757,26 +989,113 @@ const AdminInboxDetail = ({ onBack, variant = 'approval' } = {}) => {
         <div className="admin-modal-field">
           <label>Estimasi Tanggal Selesai</label>
           <div className="admin-modal-input">
-            <input type="text" placeholder="mm/dd/yyyy" />
+            <input
+              type="date"
+              value={locationForm.estimatedDate}
+              onChange={setLocationFormValue('estimatedDate')}
+            />
             <i className="bi bi-calendar3"></i>
           </div>
         </div>
 
-        {locationType === 'vendor' && (
+        {locationType === 'external' && (
           <>
             <div className="admin-modal-field">
-              <label>Nama Toko/ Vendor</label>
-              <input
-                type="text"
-                placeholder="Contoh: iBox, Bangkit cell"
-              />
+              <label>Vendor</label>
+              <select
+                value={locationForm.vendorId}
+                onChange={setLocationFormValue('vendorId')}
+              >
+                <option value="">Pilih vendor</option>
+                {vendors.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
             </div>
+
             <div className="admin-modal-field">
               <label>Alamat</label>
               <input
                 type="text"
                 placeholder="Contoh: Sudirman Central Business District"
+                value={locationForm.address}
+                onChange={setLocationFormValue('address')}
               />
+            </div>
+
+            <div className="admin-modal-field">
+              <label>Kota</label>
+              <input
+                type="text"
+                placeholder="Contoh: Jakarta"
+                value={locationForm.city}
+                onChange={setLocationFormValue('city')}
+              />
+            </div>
+
+            <div className="admin-modal-field">
+              <label>Provinsi</label>
+              <input
+                type="text"
+                placeholder="Contoh: DKI Jakarta"
+                value={locationForm.province}
+                onChange={setLocationFormValue('province')}
+              />
+            </div>
+
+            <div className="admin-modal-field">
+              <label>Kode Pos</label>
+              <input
+                type="text"
+                placeholder="Contoh: 12345"
+                value={locationForm.postalCode}
+                onChange={setLocationFormValue('postalCode')}
+              />
+            </div>
+
+            <div className="admin-modal-field">
+              <label>Link Maps</label>
+              <input
+                type="url"
+                placeholder="https://maps.google.com/?q=..."
+                value={locationForm.mapsUrl}
+                onChange={setLocationFormValue('mapsUrl')}
+              />
+            </div>
+
+            <div className="admin-modal-field">
+              <label>Biaya Service</label>
+              <div className="admin-modal-input">
+                <span>Rp</span>
+                <input
+                  type="text"
+                  value={locationForm.serviceFee}
+                  onChange={setLocationFormValue('serviceFee')}
+                />
+              </div>
+            </div>
+
+            <div className="admin-modal-field">
+              <label>Biaya Cancel (opsional)</label>
+              <div className="admin-modal-input">
+                <span>Rp</span>
+                <input
+                  type="text"
+                  value={locationForm.cancellationFee}
+                  onChange={setLocationFormValue('cancellationFee')}
+                />
+              </div>
+            </div>
+
+            <div className="admin-modal-field">
+              <label>Keterangan Biaya (opsional)</label>
+              <textarea
+                placeholder="Jelaskan detail biaya"
+                value={locationForm.costNotes}
+                onChange={setLocationFormValue('costNotes')}
+              ></textarea>
             </div>
           </>
         )}
@@ -786,100 +1105,16 @@ const AdminInboxDetail = ({ onBack, variant = 'approval' } = {}) => {
             className="admin-modal-cancel"
             type="button"
             onClick={() => setLocationModalOpen(false)}
+            disabled={isSaving}
           >
             Batal
           </button>
-          <button className="admin-modal-save" type="button">
-            Simpan
-          </button>
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={isMoveModalOpen}
-        onClose={() => setMoveModalOpen(false)}
-        className="admin-modal"
-      >
-        <button
-          className="admin-modal-close"
-          type="button"
-          onClick={() => setMoveModalOpen(false)}
-        >
-          <i className="bi bi-x"></i>
-        </button>
-        <h2>Pindah Lokasi Service</h2>
-        <p>Berikan alasan mengapa pindah lokasi service</p>
-
-        <div className="admin-modal-field">
-          <label>Alasan</label>
-          <textarea placeholder="Berikan alasan mengapa pindah lokasi service"></textarea>
-        </div>
-        <div className="admin-modal-field">
-          <label>Nama Toko/ Vendor</label>
-          <input type="text" placeholder="Contoh: iBox, Bangkit cell" />
-        </div>
-        <div className="admin-modal-field">
-          <label>Alamat</label>
-          <input
-            type="text"
-            placeholder="Contoh: Sudirman Central Business District"
-          />
-        </div>
-
-        <div className="admin-modal-actions">
           <button
-            className="admin-modal-cancel"
+            className="admin-modal-save"
             type="button"
-            onClick={() => setMoveModalOpen(false)}
+            onClick={handleSaveLocation}
+            disabled={isSaving}
           >
-            Batal
-          </button>
-          <button className="admin-modal-save" type="button">
-            Simpan
-          </button>
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={isCostModalOpen}
-        onClose={() => setCostModalOpen(false)}
-        className="admin-modal"
-      >
-        <button
-          className="admin-modal-close"
-          type="button"
-          onClick={() => setCostModalOpen(false)}
-        >
-          <i className="bi bi-x"></i>
-        </button>
-        <h2>Input Estimasi Biaya</h2>
-        <p>Masukkan estimasi biaya service</p>
-
-        <div className="admin-modal-field">
-          <label>Estimasi Biaya</label>
-          <div className="admin-modal-input">
-            <span>Rp</span>
-            <input type="text" placeholder="" />
-          </div>
-        </div>
-        <div className="admin-modal-field">
-          <label>Biaya Cancel</label>
-          <input type="text" placeholder="Contoh: iBox, Bangkit cell" />
-        </div>
-        <div className="admin-modal-field">
-          <label>Keterangan</label>
-          <textarea placeholder="Jelaskan Detail Biaya"></textarea>
-        </div>
-
-        <div className="admin-modal-actions">
-          <button
-            className="admin-modal-cancel"
-            type="button"
-            onClick={() => setCostModalOpen(false)}
-          >
-            Batal
-          </button>
-          <button className="admin-modal-save" type="button">
             Simpan
           </button>
         </div>
@@ -898,21 +1133,25 @@ const AdminInboxDetail = ({ onBack, variant = 'approval' } = {}) => {
           <i className="bi bi-x"></i>
         </button>
         <h2>Edit Approval</h2>
-        <p>Pilih atasan</p>
+        <p>Pilih atasan yang akan approve</p>
+
+        {approvalError && <div className="admin-modal-error">{approvalError}</div>}
 
         <div className="admin-modal-checklist">
-          {[
-            'Alva Simatupang',
-            'Alva Simalang',
-            'Alva Siapa',
-            'Alva Singa',
-            'Alva Silang',
-          ].map((name, index) => (
-            <label key={name} className="admin-modal-check">
-              <input type="checkbox" defaultChecked={index < 2} />
-              {name}
-            </label>
-          ))}
+          {approverOptions.map((person) => {
+            const pid = person?.id ? String(person.id) : '';
+            if (!pid) return null;
+            return (
+              <label key={pid} className="admin-modal-check">
+                <input
+                  type="checkbox"
+                  checked={selectedApprovers.has(pid)}
+                  onChange={() => toggleApprover(pid)}
+                />
+                {person.name}
+              </label>
+            );
+          })}
         </div>
 
         <div className="admin-modal-actions">
@@ -920,10 +1159,16 @@ const AdminInboxDetail = ({ onBack, variant = 'approval' } = {}) => {
             className="admin-modal-cancel"
             type="button"
             onClick={() => setApprovalModalOpen(false)}
+            disabled={isSaving}
           >
             Batal
           </button>
-          <button className="admin-modal-save" type="button">
+          <button
+            className="admin-modal-save"
+            type="button"
+            onClick={handleSaveApprovers}
+            disabled={isSaving}
+          >
             Simpan
           </button>
         </div>

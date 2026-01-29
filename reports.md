@@ -25,3 +25,8 @@ Changes 3
 - timeline actor: Added `->with('actor:id,name')` in `AuditLogService::getAuditLogsForServiceRequest()` to eager load actor information.
 - timeline description: Updated timeline mapping in `ServiceRequestService::getServiceRequestById()` to show "Request dibuat oleh {actor_name}" for CREATE_REQUEST actions.
 ----------
+
+Frontend Context Notes (No Backend Changes)
+- Admin "Inbox" is treated as an admin work queue (only requests that require admin action: approve/reject, set lokasi).
+- Vendor lokasi validation requires structured fields: `address`, `city`, `province`, `postal_code`, `maps_url` when `location_type=external`.
+- Backend naming: `vendor_approvals` is used as "Approval Atasan" in the UI (vendor-review statuses are ignored on the frontend).

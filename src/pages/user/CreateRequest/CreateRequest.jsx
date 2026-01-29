@@ -6,6 +6,7 @@ import nextIcon from '../../../assets/icons/next.svg';
 import { authenticatedRequest } from '../../../lib/api';
 import { useServiceCache } from '../../../contexts/ServiceCacheContext';
 import { useAuth } from '../../../contexts/AuthContext';
+import { getStatusMapsCached } from '../../../lib/referenceCache';
 
 const CreateRequest = () => {
   const navigate = useNavigate();
@@ -531,7 +532,15 @@ const CreateRequest = () => {
         formData.append('user_id', String(currentUserId));
       }
       formData.append('request_date', new Date().toISOString().split('T')[0]);
-      formData.append('status_id', '1'); // Pending status
+
+      const statusMaps = await getStatusMapsCached({ entityTypeId: 1 });
+      const pendingId = statusMaps.byCode.get('PENDING')?.id;
+      const approvedByAdminId = statusMaps.byCode.get('APPROVED_BY_ADMIN')?.id;
+      const statusIdForPayload = isAdminBucket
+        ? approvedByAdminId || pendingId || '1'
+        : pendingId || '1';
+
+      formData.append('status_id', String(statusIdForPayload));
 
       // Details array
       formData.append('details[0][device_type_id]', String(resolvedDeviceTypeId));
