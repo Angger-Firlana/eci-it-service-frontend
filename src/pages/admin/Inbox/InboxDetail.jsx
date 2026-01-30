@@ -147,6 +147,8 @@ const AdminInboxDetail = ({ onBack } = {}) => {
   const [approvalError, setApprovalError] = useState('');
   const [pendingVendorSubmit, setPendingVendorSubmit] = useState(null);
 
+  const [isCompleteModalOpen, setCompleteModalOpen] = useState(false);
+
   const refresh = async () => {
     if (!id) return;
     setIsLoading(true);
@@ -219,10 +221,29 @@ const AdminInboxDetail = ({ onBack } = {}) => {
     serviceStatusCode === 'PENDING' || serviceStatusCode === 'IN_REVIEW_ADMIN';
   const needsLocationSet = serviceStatusCode === 'APPROVED_BY_ADMIN';
 
+  // Additional status flags for action cards
+  const isInReviewAbove = serviceStatusCode === 'IN_REVIEW_ABOVE';
+  const isApprovedByAbove = serviceStatusCode === 'APPROVED_BY_ABOVE';
+  const isRejectedByAbove = serviceStatusCode === 'REJECTED_BY_ABOVE';
+  const isInProgress = serviceStatusCode === 'IN_PROGRESS';
+  const isCompleted = serviceStatusCode === 'COMPLETED';
+
   const activeLocation = useMemo(
     () => getActiveLocation(locations),
     [locations]
   );
+
+  // Location type flags - also infer from status if location data is missing
+  const isWorkshop = activeLocation?.location_type === 'internal';
+  const isVendor = activeLocation?.location_type === 'external' ||
+    // Infer vendor if status indicates vendor approval flow
+    (isInReviewAbove || isApprovedByAbove || isRejectedByAbove);
+
+  // Can change location if not completed (location may or may not be set yet)
+  const canChangeLocation = !isCompleted;
+
+  // Can mark as complete if IN_PROGRESS or APPROVED_BY_ABOVE
+  const canMarkComplete = isInProgress || isApprovedByAbove;
 
   const deviceInfo = useMemo(() => getDeviceInfo(detail), [detail]);
 
@@ -416,30 +437,49 @@ const AdminInboxDetail = ({ onBack } = {}) => {
     }));
   };
 
-  const openLocationModal = () => {
+  const openLocationModal = (forceType = null, freshInput = false) => {
     setLocationError('');
 
-    const nextType =
-      activeLocation?.location_type === 'external' ? 'external' : 'internal';
+    const nextType = forceType || (activeLocation?.location_type === 'external' ? 'external' : 'internal');
 
-    const serviceFee = existingCostsByCode.get('SERVICE_FEE')?.amount;
-    const cancellationFee = existingCostsByCode.get('CANCELLATION')?.amount;
+    if (freshInput) {
+      // Fresh input - don't prefill vendor/location data
+      setLocationForm({
+        estimatedDate: detail?.estimated_date
+          ? String(detail.estimated_date).slice(0, 10)
+          : '',
+        vendorId: '',
+        address: '',
+        city: '',
+        province: '',
+        postalCode: '',
+        mapsUrl: '',
+        serviceFee: '',
+        cancellationFee: '',
+        costNotes: '',
+      });
+    } else {
+      // Prefill from existing data
+      const serviceFee = existingCostsByCode.get('SERVICE_FEE')?.amount;
+      const cancellationFee = existingCostsByCode.get('CANCELLATION')?.amount;
+
+      setLocationForm({
+        estimatedDate: detail?.estimated_date
+          ? String(detail.estimated_date).slice(0, 10)
+          : '',
+        vendorId: activeLocation?.vendor_id ? String(activeLocation.vendor_id) : '',
+        address: activeLocation?.address || '',
+        city: activeLocation?.city || '',
+        province: activeLocation?.province || '',
+        postalCode: activeLocation?.postal_code || '',
+        mapsUrl: activeLocation?.maps_url || '',
+        serviceFee: serviceFee != null ? String(serviceFee) : '',
+        cancellationFee: cancellationFee != null ? String(cancellationFee) : '',
+        costNotes: '',
+      });
+    }
 
     setLocationType(nextType);
-    setLocationForm({
-      estimatedDate: detail?.estimated_date
-        ? String(detail.estimated_date).slice(0, 10)
-        : '',
-      vendorId: activeLocation?.vendor_id ? String(activeLocation.vendor_id) : '',
-      address: activeLocation?.address || '',
-      city: activeLocation?.city || '',
-      province: activeLocation?.province || '',
-      postalCode: activeLocation?.postal_code || '',
-      mapsUrl: activeLocation?.maps_url || '',
-      serviceFee: serviceFee != null ? String(serviceFee) : '',
-      cancellationFee: cancellationFee != null ? String(cancellationFee) : '',
-      costNotes: '',
-    });
     setLocationModalOpen(true);
   };
 
@@ -556,6 +596,14 @@ const AdminInboxDetail = ({ onBack } = {}) => {
     }
   };
 
+  const deleteAllCosts = async () => {
+    for (const cost of costs) {
+      if (cost?.id) {
+        await authenticatedRequest(`/service-requests/${id}/costs/${cost.id}`, { method: 'DELETE' });
+      }
+    }
+  };
+
   const fetchApproverOptions = async (serviceRequestId) => {
     const res = await authenticatedRequest(`/service-requests/${serviceRequestId}/approver`);
     if (!res.ok) {
@@ -575,6 +623,15 @@ const AdminInboxDetail = ({ onBack } = {}) => {
       const estimatedDate = String(locationForm.estimatedDate || '').trim();
       if (!estimatedDate) {
         throw new Error('Estimasi tanggal selesai wajib diisi');
+      }
+
+      // Check if location type is changing (vendor <-> workshop)
+      const currentLocationType = activeLocation?.location_type;
+      const isLocationTypeChange = currentLocationType && currentLocationType !== locationType;
+
+      // Delete all costs when changing location type
+      if (isLocationTypeChange) {
+        await deleteAllCosts();
       }
 
       if (locationType === 'internal') {
@@ -600,7 +657,7 @@ const AdminInboxDetail = ({ onBack } = {}) => {
           body: {
             status_id: Number(inProgressId),
             estimated_date: estimatedDate,
-            log_notes: 'Diset ke workshop (internal)',
+            log_notes: isLocationTypeChange ? 'Dipindah ke workshop (internal)' : 'Diset ke workshop (internal)',
           },
         });
         if (!updateRes.ok) {
@@ -660,29 +717,22 @@ const AdminInboxDetail = ({ onBack } = {}) => {
         await upsertCost(id, 'CANCELLATION', cancelFee, locationForm.costNotes);
       }
 
-      const { list: approvers } = await fetchApproverOptions(id);
-      if (!approvers.length) {
-        throw new Error('Tidak ada atasan tersedia untuk approval');
+      // Update estimated date without auto-opening approval modal
+      // Admin can set approvers separately via "Set Approvers" button
+      const updateRes = await authenticatedRequest(`/service-requests/${id}`, {
+        method: 'PUT',
+        body: {
+          estimated_date: estimatedDate,
+          log_notes: isLocationTypeChange ? 'Dipindah ke vendor (eksternal)' : 'Diset ke vendor (eksternal)',
+        },
+      });
+      if (!updateRes.ok) {
+        throw new Error(getErrorMessage(updateRes.data, 'Gagal update estimasi'));
       }
 
-      setApproverOptions(approvers);
-      setSelectedApprovers((prev) => {
-        if (prev.size) return prev;
-        const next = new Set();
-        const pickCount = Math.min(2, approvers.length);
-        for (let i = 0; i < pickCount; i += 1) {
-          if (approvers[i]?.id) next.add(String(approvers[i].id));
-        }
-        return next;
-      });
-      setPendingVendorSubmit({
-        estimatedDate,
-        logNotes: locationForm.costNotes,
-      });
-
       setLocationModalOpen(false);
-      setApprovalError('');
-      setApprovalModalOpen(true);
+      invalidateServiceRequestCache(id);
+      await refresh();
     } catch (err) {
       setLocationError(err.message || 'Gagal menyimpan lokasi');
     } finally {
@@ -749,6 +799,34 @@ const AdminInboxDetail = ({ onBack } = {}) => {
       await refresh();
     } catch (err) {
       setApprovalError(err.message || 'Gagal menyimpan approval');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleMarkComplete = async () => {
+    setCompleteModalOpen(false);
+    setIsSaving(true);
+    setError('');
+    try {
+      const completedId = serviceStatusByCode.get('COMPLETED')?.id;
+      if (!completedId) {
+        throw new Error('Status COMPLETED tidak ditemukan');
+      }
+      const res = await authenticatedRequest(`/service-requests/${id}`, {
+        method: 'PUT',
+        body: {
+          status_id: Number(completedId),
+          log_notes: 'Service ditandai selesai',
+        },
+      });
+      if (!res.ok) {
+        throw new Error(getErrorMessage(res.data, 'Gagal menyelesaikan service'));
+      }
+      invalidateServiceRequestCache(id);
+      await refresh();
+    } catch (err) {
+      setError(err.message || 'Gagal menyelesaikan service');
     } finally {
       setIsSaving(false);
     }
@@ -950,7 +1028,8 @@ const AdminInboxDetail = ({ onBack } = {}) => {
             </section>
           )}
 
-          {vendorApprovals.length > 0 && approvalSummary && (
+          {/* Status Approval - only show for vendor, not workshop */}
+          {isVendor && vendorApprovals.length > 0 && approvalSummary && (
             <section className="admin-approval-card">
               <div className="admin-approval-head">
                 <div>
@@ -1029,6 +1108,150 @@ const AdminInboxDetail = ({ onBack } = {}) => {
                   );
                 })}
               </div>
+            </section>
+          )}
+
+          {/* Fallback approval status card when in approval flow but vendorApprovals data is missing */}
+          {vendorApprovals.length === 0 && (isInReviewAbove || isApprovedByAbove || isRejectedByAbove) && (
+            <section className="admin-approval-card">
+              <div className="admin-approval-head">
+                <div>
+                  <h2>Status Approval</h2>
+                  <p>
+                    {isApprovedByAbove && 'Disetujui oleh atasan'}
+                    {isRejectedByAbove && 'Ditolak oleh atasan'}
+                    {isInReviewAbove && 'Menunggu approval dari atasan'}
+                  </p>
+                </div>
+                <button
+                  className="admin-detail-edit"
+                  type="button"
+                  onClick={async () => {
+                    setApprovalError('');
+                    try {
+                      const { list: approvers } = await fetchApproverOptions(id);
+                      setApproverOptions(approvers);
+                      setSelectedApprovers(new Set());
+                      setPendingVendorSubmit({
+                        estimatedDate: detail?.estimated_date
+                          ? String(detail.estimated_date).slice(0, 10)
+                          : null,
+                        logNotes: 'Update approval atasan',
+                      });
+                      setApprovalModalOpen(true);
+                    } catch (err) {
+                      setError(err.message || 'Gagal memuat atasan');
+                    }
+                  }}
+                >
+                  <i className="bi bi-pencil"></i>
+                </button>
+              </div>
+            </section>
+          )}
+
+          {/* Set Approvers - show when vendor is set but no approvers yet AND not already in approval flow */}
+          {isVendor && vendorApprovals.length === 0 && !isCompleted && !isInReviewAbove && !isApprovedByAbove && !isRejectedByAbove && (
+            <section className="admin-action-card">
+              <h2>Set Approvers</h2>
+              <p>Pilih atasan untuk approval biaya vendor</p>
+              <button
+                className="admin-action-primary"
+                type="button"
+                onClick={async () => {
+                  setApprovalError('');
+                  try {
+                    const { list: approvers } = await fetchApproverOptions(id);
+                    if (!approvers.length) {
+                      setError('Tidak ada atasan tersedia untuk approval');
+                      return;
+                    }
+                    setApproverOptions(approvers);
+                    setSelectedApprovers(new Set());
+                    setPendingVendorSubmit({
+                      estimatedDate: detail?.estimated_date
+                        ? String(detail.estimated_date).slice(0, 10)
+                        : null,
+                      logNotes: 'Menunggu approval atasan',
+                    });
+                    setApprovalModalOpen(true);
+                  } catch (err) {
+                    setError(err.message || 'Gagal memuat atasan');
+                  }
+                }}
+                disabled={isSaving}
+              >
+                <i className="bi bi-people"></i>
+                Set Approvers
+              </button>
+            </section>
+          )}
+
+          {/* Pindah ke Workshop - show when at vendor and not completed */}
+          {isVendor && canChangeLocation && (
+            <section className="admin-action-card">
+              <h2>Pindah Ke Workshop</h2>
+              <p>Pindahkan service ke workshop internal</p>
+              <button
+                className="admin-action-primary"
+                type="button"
+                onClick={() => openLocationModal('internal', true)}
+                disabled={isSaving}
+              >
+                <i className="bi bi-building"></i>
+                Pindah Workshop
+              </button>
+            </section>
+          )}
+
+          {/* Pindah ke Vendor - show when at workshop and not completed */}
+          {isWorkshop && canChangeLocation && (
+            <section className="admin-action-card">
+              <h2>Pindah Ke Vendor</h2>
+              <p>Pindahkan service ke vendor eksternal</p>
+              <button
+                className="admin-action-primary"
+                type="button"
+                onClick={() => openLocationModal('external', true)}
+                disabled={isSaving}
+              >
+                <i className="bi bi-shop"></i>
+                Pindah Vendor
+              </button>
+            </section>
+          )}
+
+          {/* Edit Vendor - show for vendor when in review, approved by above, or rejected by above */}
+          {isVendor && (isInReviewAbove || isApprovedByAbove || isRejectedByAbove) && (
+            <section className="admin-action-card">
+              <h2>Edit Vendor</h2>
+              <p>Edit vendor, alamat, atau biaya service</p>
+              <button
+                className="admin-action-primary"
+                type="button"
+                onClick={() => openLocationModal('external', false)}
+                disabled={isSaving}
+              >
+                <i className="bi bi-pencil"></i>
+                Edit Vendor
+              </button>
+            </section>
+          )}
+
+          {/* Selesaikan Service - show when IN_PROGRESS or APPROVED_BY_ABOVE */}
+          {canMarkComplete && (
+            <section className="admin-action-card">
+              <h2>Selesaikan Service</h2>
+              <p>Tandai service ini sebagai selesai</p>
+              <button
+                className="admin-action-primary admin-action-complete"
+                type="button"
+                onClick={() => setCompleteModalOpen(true)}
+                disabled={isSaving}
+              >
+                <i className="bi bi-check-circle"></i>
+                Tandai Selesai
+              </button>
             </section>
           )}
 
@@ -1283,6 +1506,41 @@ const AdminInboxDetail = ({ onBack } = {}) => {
             disabled={isSaving}
           >
             Simpan
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isCompleteModalOpen}
+        onClose={() => setCompleteModalOpen(false)}
+        className="admin-modal"
+      >
+        <button
+          className="admin-modal-close"
+          type="button"
+          onClick={() => setCompleteModalOpen(false)}
+        >
+          <i className="bi bi-x"></i>
+        </button>
+        <h2>Selesaikan Service?</h2>
+        <p>Apakah Anda yakin ingin menandai service ini sebagai selesai?</p>
+
+        <div className="admin-modal-actions">
+          <button
+            className="admin-modal-cancel"
+            type="button"
+            onClick={() => setCompleteModalOpen(false)}
+            disabled={isSaving}
+          >
+            Batal
+          </button>
+          <button
+            className="admin-modal-save"
+            type="button"
+            onClick={handleMarkComplete}
+            disabled={isSaving}
+          >
+            Ya, Selesai
           </button>
         </div>
       </Modal>
