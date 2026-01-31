@@ -11,5 +11,9 @@
       "Bash(php artisan:*)",
       "Bash(python:*)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "serena"
+  ],
+  "enableAllProjectMcpServers": true
 }

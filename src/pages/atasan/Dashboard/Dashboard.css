@@ -150,3 +150,45 @@
     width: 100%;
   }
 }
+
+.atasan-dashboard-loading {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+  font-size: 14px;
+}
+
+.atasan-dashboard-error {
+  text-align: center;
+  padding: 40px 20px;
+  color: #dc3545;
+}
+
+.atasan-dashboard-error p {
+  margin: 0 0 16px;
+  white-space: pre-line;
+}
+
+.atasan-dashboard-error button {
+  padding: 8px 20px;
+  background: #3f7d29;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.atasan-dashboard-error button:hover {
+  background: #346b22;
+}
+
+.atasan-empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #888;
+  font-size: 14px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}

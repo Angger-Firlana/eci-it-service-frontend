@@ -334,3 +334,251 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Loading and Error States */
+.atasan-detail-loading {
+  text-align: center;
+  padding: 60px 20px;
+  color: #666;
+  font-size: 14px;
+}
+
+.atasan-detail-error {
+  text-align: center;
+  padding: 60px 20px;
+  color: #dc3545;
+}
+
+.atasan-detail-error p {
+  margin: 0 0 16px;
+  white-space: pre-line;
+}
+
+.atasan-detail-error button {
+  padding: 8px 20px;
+  background: #3f7d29;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* Action Card Enhancements */
+.atasan-action-error {
+  background: #fff5f5;
+  border: 1px solid #ffcccc;
+  border-radius: 6px;
+  padding: 10px;
+  color: #dc3545;
+  font-size: 12px;
+  white-space: pre-line;
+}
+
+.atasan-action-success {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+  padding: 10px;
+  color: #16a34a;
+  font-size: 12px;
+}
+
+.atasan-action-textarea:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.atasan-action-reject:disabled,
+.atasan-action-approve:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Status Cards (Already Approved/Rejected) */
+.atasan-status-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 11px;
+  background: #fff;
+  border: 1px solid #D9D9D9;
+}
+
+.atasan-status-card i {
+  font-size: 28px;
+}
+
+.atasan-status-card h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.atasan-status-card p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #6b6b6b;
+}
+
+.atasan-status-approved {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.atasan-status-approved i {
+  color: #16a34a;
+}
+
+.atasan-status-approved h3 {
+  color: #16a34a;
+}
+
+.atasan-status-rejected {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.atasan-status-rejected i {
+  color: #dc2626;
+}
+
+.atasan-status-rejected h3 {
+  color: #dc2626;
+}
+
+/* Approval Status Card */
+.atasan-approval-card {
+  background: #fff;
+  border: 1px solid #D9D9D9;
+  border-radius: 11px;
+  box-shadow: var(--shadow);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.atasan-approval-card h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.atasan-approval-card > p {
+  margin: -8px 0 0;
+  font-size: 12px;
+  color: #6b6b6b;
+}
+
+.atasan-approval-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.atasan-approval-bar {
+  flex: 1;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.atasan-approval-bar-fill {
+  display: block;
+  height: 100%;
+  background: #3f7d29;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.atasan-approval-count {
+  font-size: 12px;
+  font-weight: 500;
+  color: #333;
+  white-space: nowrap;
+}
+
+.atasan-approval-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.atasan-approval-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.atasan-approval-item.atasan-approval-me {
+  background: #f0f9ff;
+  border-color: #bae6fd;
+}
+
+.atasan-approval-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+}
+
+.atasan-approval-you {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #0ea5e9;
+}
+
+.atasan-approval-note {
+  font-size: 11px;
+  color: #6b6b6b;
+  margin-top: 2px;
+}
+
+.atasan-approval-status {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.atasan-approval-waiting .atasan-approval-status {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.atasan-approval-approved .atasan-approval-status {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.atasan-approval-rejected .atasan-approval-status {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* Estimate Total Row */
+.atasan-estimate-total {
+  font-weight: 600;
+  border-bottom: none;
+  padding-top: 4px;
+}
+
+.atasan-estimate-total span:last-child {
+  color: #3f7d29;
+  font-size: 14px;
+}
+
+/* Timeline Empty State */
+.atasan-timeline-empty {
+  text-align: center;
+  padding: 20px;
+  color: #888;
+  font-size: 13px;
+}

@@ -159,3 +159,113 @@
     min-width: 860px;
   }
 }
+
+/* Filter select dropdown */
+.atasan-filter-select {
+  border: 1px solid #D9D9D9;
+  border-radius: 10px;
+  background: #fff;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #6b6b6b;
+  cursor: pointer;
+  outline: none;
+  min-width: 160px;
+}
+
+.atasan-filter-select:focus {
+  border-color: #3f7d29;
+}
+
+/* Inbox loading state */
+.atasan-inbox-loading {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+  font-size: 14px;
+}
+
+/* Inbox error state */
+.atasan-inbox-error {
+  background: #fff5f5;
+  border: 1px solid #ffcccc;
+  border-radius: 8px;
+  padding: 16px;
+  color: #dc3545;
+  font-size: 13px;
+  white-space: pre-line;
+}
+
+/* Inbox empty state */
+.atasan-inbox-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #888;
+  font-size: 14px;
+}
+
+/* Status colors for inbox */
+.atasan-status-pending {
+  color: #f59e0b;
+  font-weight: 500;
+}
+
+.atasan-status-approved {
+  color: #10b981;
+  font-weight: 500;
+}
+
+.atasan-status-rejected {
+  color: #ef4444;
+  font-weight: 500;
+}
+
+/* Code column highlight */
+.atasan-code {
+  font-weight: 500;
+  color: #333;
+}
+
+/* Pagination */
+.atasan-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px 0;
+}
+
+.atasan-pagination-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid #D9D9D9;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.atasan-pagination-btn:hover:not(:disabled) {
+  background: #f5f5f5;
+  border-color: #3f7d29;
+}
+
+.atasan-pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.atasan-pagination-info {
+  font-size: 13px;
+  color: #666;
+}
+
+/* Filter button disabled state */
+.atasan-filter-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

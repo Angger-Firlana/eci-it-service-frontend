@@ -1,46 +1,252 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import './ServiceList.css';
 import eyeIcon from '../../../assets/icons/lihatdetail(eye).svg';
+import { authenticatedRequest } from '../../../lib/api';
+import {
+  getServiceRequestCostsTotalCached,
+  getServiceRequestDetailCached,
+  getServiceRequestLocationsCached,
+} from '../../../lib/serviceRequestCache';
 
-const SERVICE_ROWS = [
-  {
-    id: 1,
-    code: 'ABCD01',
-    device: 'Laptop',
-    model: 'Lenovo v14',
-    service: 'Hardware',
-    location: 'Workshop',
-    date: '6/1/2021',
-    cost: '',
-    status: 'Proses',
-    detailVariant: 'approval',
-  },
-  {
-    id: 2,
-    code: 'ABCD02',
-    device: 'Printer',
-    model: 'Canon G2010',
-    service: 'Hardware',
-    location: 'Vendor',
-    date: '8/4/2026',
-    cost: 'Rp 200.000',
-    status: 'Selesai',
-    detailVariant: 'progress',
-  },
-];
+const PER_PAGE = 10;
 
-const ServiceList = ({ onViewDetail } = {}) => {
+const formatDate = (dateString) => {
+  if (!dateString) return '-';
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return '-';
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+
+const formatRupiah = (amount) => {
+  const value = Number(amount);
+  if (!Number.isFinite(value) || value <= 0) return '-';
+  return `Rp ${Math.round(value).toLocaleString('id-ID')}`;
+};
+
+const getErrorMessage = (payload, fallback) => {
+  if (!payload) return fallback;
+  if (typeof payload === 'string') return payload;
+  if (payload?.errors && typeof payload.errors === 'object') {
+    const lines = [];
+    for (const [key, value] of Object.entries(payload.errors)) {
+      lines.push(`${key}: ${Array.isArray(value) ? value.join(', ') : String(value)}`);
+    }
+    if (lines.length) return lines.join('\n');
+  }
+  if (typeof payload?.error === 'string') return payload.error;
+  if (typeof payload?.message === 'string') return payload.message;
+  return fallback;
+};
+
+const normalizeListPayload = (responseData) => {
+  const data = responseData?.data || responseData;
+  const items = Array.isArray(data) ? data : data?.data || [];
+  const meta = data?.meta || responseData?.meta || null;
+  return { items, meta };
+};
+
+const getDeviceLabel = (service) => {
+  const firstDetail = service.service_request_details?.[0];
+  const device = firstDetail?.device;
+  const deviceModel = device?.device_model;
+  return (
+    device?.device_type?.name ||
+    deviceModel?.device_type?.name ||
+    '-'
+  );
+};
+
+const getModelLabel = (service) => {
+  const firstDetail = service.service_request_details?.[0];
+  const deviceModel = firstDetail?.device?.device_model;
+  const brand = deviceModel?.brand || '';
+  const model = deviceModel?.model || '';
+  const label = [brand, model].filter(Boolean).join(' ');
+  return label || '-';
+};
+
+const getServiceTypeLabel = (service) => {
+  const firstDetail = service.service_request_details?.[0];
+  return firstDetail?.service_type?.name || '-';
+};
+
+const getLocationLabel = (locations) => {
+  if (!Array.isArray(locations) || locations.length === 0) return '-';
+  const active = locations.find((loc) => loc?.is_active) || locations[locations.length - 1];
+  const type = String(active?.location_type || '').toLowerCase();
+  if (type === 'internal') return 'Workshop';
+  if (type === 'external') return 'Vendor';
+  return '-';
+};
+
+const needsDetailFetch = (item) => {
+  const firstDetail = item?.service_request_details?.[0];
+  return !firstDetail || !firstDetail.device || !firstDetail.service_type;
+};
+
+const ServiceList = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentPage = parseInt(searchParams.get('page') || '1', 10);
+  const querySearch = searchParams.get('search') || '';
+
+  const [search, setSearch] = useState(querySearch);
+  const [rows, setRows] = useState([]);
+  const [pagination, setPagination] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setSearch(querySearch);
+  }, [querySearch]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let cancelled = false;
+
+    const fetchServices = async () => {
+      setIsLoading(true);
+      setError('');
+
+      console.log('[Atasan/ServiceList] Fetching page', currentPage);
+
+      try {
+        const params = new URLSearchParams();
+        params.set('page', String(currentPage));
+        params.set('per_page', String(PER_PAGE));
+        if (querySearch.trim()) {
+          params.set('search', querySearch.trim());
+        }
+
+        const response = await authenticatedRequest(`/service-requests?${params.toString()}`, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok || response.data?.success === false) {
+          throw new Error(getErrorMessage(response.data, 'Gagal memuat daftar service'));
+        }
+
+        const { items, meta } = normalizeListPayload(response.data);
+        const baseItems = items.filter((item) => item && item.id);
+
+        console.log('[Atasan/ServiceList] Received', baseItems.length, 'items');
+
+        // Enrich with details, locations, and costs
+        const details = await Promise.all(
+          baseItems.map(async (item) => {
+            if (!needsDetailFetch(item)) return item;
+            try {
+              return await getServiceRequestDetailCached(item.id, {
+                signal: controller.signal,
+              });
+            } catch (err) {
+              if (err?.name === 'AbortError') return item;
+              console.error('[Atasan/ServiceList] Detail fetch error:', item.id, err);
+              return item;
+            }
+          })
+        );
+
+        const detailIds = details.map((item) => item?.id).filter(Boolean);
+
+        const [locationsList, costsTotals] = await Promise.all([
+          Promise.all(
+            detailIds.map((id) =>
+              getServiceRequestLocationsCached(id, { signal: controller.signal })
+            )
+          ),
+          Promise.all(
+            detailIds.map((id) =>
+              getServiceRequestCostsTotalCached(id, { signal: controller.signal })
+            )
+          ),
+        ]);
+
+        const computedRows = details.map((service, index) => {
+          const id = service.id;
+          const locations = locationsList[index] || [];
+          const costTotal = costsTotals[index] || 0;
+
+          return {
+            id,
+            code: service.service_number || `SR-${id}`,
+            device: getDeviceLabel(service),
+            model: getModelLabel(service),
+            service: getServiceTypeLabel(service),
+            location: getLocationLabel(locations),
+            date: formatDate(service.request_date || service.created_at),
+            cost: formatRupiah(costTotal),
+            status: service.status?.name || '-',
+            _original: service,
+          };
+        });
+
+        if (cancelled) return;
+        setRows(computedRows);
+        setPagination(
+          meta
+            ? {
+                current_page: meta.current_page,
+                last_page: meta.last_page,
+                total: meta.total,
+              }
+            : null
+        );
+
+        console.log('[Atasan/ServiceList] Loaded successfully');
+      } catch (err) {
+        if (cancelled) return;
+        if (err?.name === 'AbortError') return;
+        console.error('[Atasan/ServiceList] Fetch error:', err);
+        setError(getErrorMessage(err, 'Gagal memuat daftar service'));
+        setRows([]);
+        setPagination(null);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    fetchServices();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [currentPage, querySearch]);
 
   const handleViewDetail = (row) => {
-    if (onViewDetail) {
-      onViewDetail(row);
-      return;
-    }
-    const variantParam = row.detailVariant ? `?variant=${row.detailVariant}` : '';
-    navigate(`/services/${row.id}${variantParam}`);
+    navigate(`/services/${row.id}`);
   };
+
+  const canGoPrev = useMemo(() => currentPage > 1, [currentPage]);
+  const canGoNext = useMemo(
+    () => (pagination ? currentPage < pagination.last_page : false),
+    [currentPage, pagination]
+  );
+
+  const setPage = (page) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('page', String(page));
+    setSearchParams(nextParams);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const applySearch = () => {
+    const nextParams = new URLSearchParams(searchParams);
+    const trimmed = search.trim();
+    if (trimmed) {
+      nextParams.set('search', trimmed);
+    } else {
+      nextParams.delete('search');
+    }
+    nextParams.set('page', '1');
+    setSearchParams(nextParams);
+  };
+
   return (
     <div className="atasan-service-list">
       <div className="atasan-service-header">
@@ -49,22 +255,36 @@ const ServiceList = ({ onViewDetail } = {}) => {
 
       <div className="atasan-service-controls">
         <div className="atasan-search-box">
-          <input type="text" placeholder="" aria-label="Search" />
-          <i className="bi bi-search"></i>
+          <input
+            type="text"
+            placeholder="Cari service..."
+            aria-label="Search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                applySearch();
+              }
+            }}
+          />
+          <i
+            className="bi bi-search"
+            onClick={applySearch}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') applySearch();
+            }}
+          />
         </div>
 
         <div className="atasan-filter-group">
-          <button className="atasan-filter-btn" type="button">
+          <button className="atasan-filter-btn" type="button" disabled>
             <i className="bi bi-calendar3"></i>
             <span>Date</span>
             <i className="bi bi-chevron-down"></i>
           </button>
-          <button className="atasan-filter-btn" type="button">
-            <i className="bi bi-geo-alt"></i>
-            <span>Lokasi</span>
-            <i className="bi bi-chevron-down"></i>
-          </button>
-          <button className="atasan-filter-btn" type="button">
+          <button className="atasan-filter-btn" type="button" disabled>
             <i className="bi bi-funnel"></i>
             <span>Status</span>
             <i className="bi bi-chevron-down"></i>
@@ -72,52 +292,94 @@ const ServiceList = ({ onViewDetail } = {}) => {
         </div>
       </div>
 
-      <div className="atasan-service-table">
-        <div className="atasan-service-row atasan-service-head">
-          <div>Kode</div>
-          <div>Perangkat</div>
-          <div>Model</div>
-          <div>Service</div>
-          <div>Lokasi</div>
-          <div>Tanggal</div>
-          <div>Biaya</div>
-          <div>Status</div>
-          <div></div>
-        </div>
+      {isLoading && <div className="atasan-inbox-loading">Memuat daftar service...</div>}
 
-        {SERVICE_ROWS.map((row) => (
-          <div className="atasan-service-row" key={row.id}>
-            <div className="atasan-code">{row.code}</div>
-            <div>{row.device}</div>
-            <div>{row.model}</div>
-            <div>{row.service}</div>
-            <div>{row.location}</div>
-            <div>
-              <input
-                className="atasan-date-input"
-                type="text"
-                value={row.date}
-                readOnly
-              />
+      {!isLoading && error && (
+        <div className="atasan-inbox-error">
+          <p>{error}</p>
+          <button type="button" onClick={() => window.location.reload()}>
+            Coba Lagi
+          </button>
+        </div>
+      )}
+
+      {!isLoading && !error && (
+        <>
+          <div className="atasan-service-table">
+            <div className="atasan-service-row atasan-service-head">
+              <div>Kode</div>
+              <div>Perangkat</div>
+              <div>Model</div>
+              <div>Service</div>
+              <div>Lokasi</div>
+              <div>Tanggal</div>
+              <div>Biaya</div>
+              <div>Status</div>
+              <div></div>
             </div>
-            <div className="atasan-cost">{row.cost}</div>
-            <div className="atasan-status">{row.status}</div>
-            <div className="atasan-actions">
-              <button className="atasan-ellipsis" type="button" aria-label="Menu">
-                ...
-              </button>
-              <button
-                className="atasan-detail-btn"
-                type="button"
-                onClick={() => handleViewDetail(row)}
-              >
-                <img src={eyeIcon} alt="Detail" />
-                Detail
-              </button>
-            </div>
+
+            {rows.length === 0 ? (
+              <div className="atasan-inbox-empty">Tidak ada service request</div>
+            ) : (
+              rows.map((row) => (
+                <div className="atasan-service-row" key={row.id}>
+                  <div className="atasan-code">{row.code}</div>
+                  <div>{row.device}</div>
+                  <div>{row.model}</div>
+                  <div>{row.service}</div>
+                  <div>{row.location}</div>
+                  <div>
+                    <input className="atasan-date-input" type="text" value={row.date} readOnly />
+                  </div>
+                  <div className="atasan-cost">{row.cost}</div>
+                  <div className="atasan-status">{row.status}</div>
+                  <div className="atasan-actions">
+                    <button className="atasan-ellipsis" type="button" aria-label="Menu" disabled>
+                      ...
+                    </button>
+                    <button
+                      className="atasan-detail-btn"
+                      type="button"
+                      onClick={() => handleViewDetail(row)}
+                    >
+                      <img src={eyeIcon} alt="Detail" />
+                      Detail
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
-        ))}
-      </div>
+
+          {pagination && pagination.last_page > 1 && (
+            <div className="atasan-pagination">
+              <button
+                className="atasan-pagination-btn"
+                type="button"
+                onClick={() => setPage(currentPage - 1)}
+                disabled={!canGoPrev}
+              >
+                <i className="bi bi-chevron-left"></i>
+                Prev
+              </button>
+
+              <span className="atasan-pagination-info">
+                Page {pagination.current_page} of {pagination.last_page}
+              </span>
+
+              <button
+                className="atasan-pagination-btn"
+                type="button"
+                onClick={() => setPage(currentPage + 1)}
+                disabled={!canGoNext}
+              >
+                Next
+                <i className="bi bi-chevron-right"></i>
+              </button>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };
