@@ -33,8 +33,20 @@ function App() {
   useEffect(() => {
     setUnauthorizedHandler(() => {
       logout();
+      // Force reload to /login to clear any stale state
       window.location.href = '/login';
     });
+  }, [logout]);
+
+  // Clear auth if user is missing but token exists (corrupted state)
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token');
+    const storedUser = localStorage.getItem('auth_user');
+    
+    if (token && !storedUser) {
+      console.warn('[App] Token exists but no user data - clearing auth');
+      logout();
+    }
   }, [logout]);
 
   const role = user?.role?.toLowerCase() || 'user';

@@ -4,6 +4,7 @@ import './InboxDetail.css';
 import backIcon from '../../../assets/icons/back.svg';
 import { Modal } from '../../../components/common';
 import { authenticatedRequest, unwrapApiData, buildApiUrl } from '../../../lib/api';
+import { useAuth } from '../../../contexts/AuthContext';
 import {
   getCostTypesCached,
   getStatusMapsCached,
@@ -119,6 +120,7 @@ const parseCurrencyNumber = (value) => {
 const AdminInboxDetail = ({ onBack } = {}) => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [detail, setDetail] = useState(null);
   const [locations, setLocations] = useState([]);
@@ -524,6 +526,7 @@ const serviceStatusCode = serviceStatus?.code || '';
         method: 'PUT',
         body: {
           status_id: Number(approvedByAdminId),
+          admin_id: user?.id, // Set admin_id when approving
           log_notes: actionNote.trim() || 'Request di-approve oleh admin',
         },
       });
@@ -557,6 +560,7 @@ const serviceStatusCode = serviceStatus?.code || '';
         method: 'PUT',
         body: {
           status_id: Number(rejectedId),
+          admin_id: user?.id, // Set admin_id when rejecting
           log_notes: actionNote.trim() || 'Request ditolak oleh admin',
         },
       });
@@ -856,7 +860,12 @@ const serviceStatusCode = serviceStatus?.code || '';
 
     try {
       const token = localStorage.getItem('auth_token');
-      const url = buildApiUrl(`/service-requests/${id}/preview-invoice`);
+      // Use preview-invoice for non-COMPLETED status (generates on-the-fly)
+      // Use download-invoice for COMPLETED status (stored Invoice record)
+      const endpoint = isCompleted ? 'download-invoice' : 'preview-invoice';
+      const url = buildApiUrl(`/service-requests/${id}/${endpoint}`);
+
+      console.log('[Admin/InboxDetail] Downloading invoice:', { id, endpoint, status: serviceStatusCode });
 
       const response = await fetch(url, {
         method: 'GET',
@@ -879,7 +888,10 @@ const serviceStatusCode = serviceStatus?.code || '';
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(downloadUrl);
+
+      console.log('[Admin/InboxDetail] Invoice downloaded successfully');
     } catch (err) {
+      console.error('[Admin/InboxDetail] Invoice download failed:', err);
       alert(err.message || 'Gagal mengunduh invoice');
     } finally {
       setIsDownloading(false);

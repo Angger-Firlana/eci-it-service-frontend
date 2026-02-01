@@ -159,11 +159,16 @@ const ServiceDetail = () => {
     if (!id || isDownloading) return;
 
     setIsDownloading(true);
-    console.log('[User/ServiceDetail] Downloading invoice for:', id);
 
     try {
       const token = localStorage.getItem('auth_token');
-      const url = buildApiUrl(`/service-requests/${id}/preview-invoice`);
+      // Use preview-invoice for non-COMPLETED status (generates on-the-fly)
+      // Use download-invoice for COMPLETED status (stored Invoice record)
+      const isCompleted = serviceStatusCode === 'COMPLETED';
+      const endpoint = isCompleted ? 'download-invoice' : 'preview-invoice';
+      const url = buildApiUrl(`/service-requests/${id}/${endpoint}`);
+
+      console.log('[User/ServiceDetail] Downloading invoice:', { id, endpoint, status: serviceStatusCode });
 
       const response = await fetch(url, {
         method: 'GET',

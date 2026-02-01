@@ -184,4 +184,76 @@ Completed invoice download functionality for all detail pages and fixed dashboar
 | Admin InboxDetail | ✅ Complete |
 
 ### API Used
-- `GET /service-requests/{id}/preview-invoice` - Downloads PDF invoice on-the-fly
+- `GET /service-requests/{id}/preview-invoice` - Downloads PDF invoice on-the-fly (deprecated)
+- `GET /service-requests/{id}/download-invoice` - Downloads stored invoice PDF
+
+---
+
+## Session: 2026-02-01 - Bug Fixes (Admin ID & Invoice URL)
+
+### Overview
+Fixed critical bugs: admin_id not being set when admin approves, wrong invoice URL, and improved auth redirect handling.
+
+### Changes Made
+
+#### 1. Admin ID Not Set on Approval (`src/pages/admin/Inbox/InboxDetail.jsx`)
+**Problem:** When admin approves/rejects a request, `admin_id` field was not being populated on the service request.
+
+**Root Cause:** Backend `ServiceRequestService::updateServiceRequest()` expects `admin_id` in the request body:
+```php
+if(auth()->user()->roles->contains('id', Role::ADMIN)){
+    $serviceRequest->update([
+        'admin_id' => $data['admin_id'] ?? $serviceRequest->admin_id,
+    ]);
+}
+```
+If `admin_id` is not provided, it keeps the old value (null for user-created requests).
+
+**Fix:**
+- Added `import { useAuth } from '../../../contexts/AuthContext'`
+- Added `const { user } = useAuth()` to component
+- Updated `handleAdminApprove()` to include `admin_id: user?.id` in PUT body
+- Updated `handleAdminReject()` to include `admin_id: user?.id` in PUT body
+
+#### 2. Wrong Invoice URL - Hybrid Approach (All Detail Pages)
+**Problem:** Frontend was using `/service-requests/{id}/preview-invoice` instead of `/download-invoice`.
+
+**Backend Routes:**
+- `/download-invoice` → Returns stored Invoice PDF (requires COMPLETED status, Invoice record must exist)
+- `/preview-invoice` → Generates PDF on-the-fly (works from APPROVED_BY_ADMIN onwards, no Invoice record needed)
+
+**Initial Fix Attempt:** Changed to use `/download-invoice` exclusively → **Failed for non-COMPLETED requests** (no Invoice record exists, returns "Data Not Found").
+
+**Final Solution - Hybrid Approach:**
+```javascript
+const isCompleted = serviceStatusCode === 'COMPLETED';
+const endpoint = isCompleted ? 'download-invoice' : 'preview-invoice';
+```
+
+- **COMPLETED status** → Uses `/download-invoice` (stored Invoice with final data)
+- **Earlier statuses** (APPROVED_BY_ADMIN, IN_PROGRESS, etc.) → Uses `/preview-invoice` (generates on-the-fly)
+
+**Files Updated:**
+- `src/pages/user/ServiceList/ServiceDetail.jsx`
+- `src/pages/atasan/ServiceList/ServiceDetail.jsx`
+- `src/pages/atasan/Inbox/InboxDetail.jsx`
+- `src/pages/admin/Inbox/InboxDetail.jsx`
+
+#### 3. Enhanced Auth Redirect (`src/App.tsx`)
+**Problem:** User wanted better handling when not authenticated - should immediately redirect to login instead of showing error.
+
+**Improvements:**
+- Already had redirect in place: `!isAuthenticated` → `<Navigate to="/login" />`
+- Already had 401 handler: `setUnauthorizedHandler()` calls `logout()` + redirect
+- **Added**: Clear corrupted auth state check - if token exists but user data is missing, auto-logout and redirect
+
+### Files Modified
+- `src/pages/admin/Inbox/InboxDetail.jsx` - Added admin_id to approve/reject, changed invoice URL
+- `src/pages/user/ServiceList/ServiceDetail.jsx` - Changed invoice URL
+- `src/pages/atasan/ServiceList/ServiceDetail.jsx` - Changed invoice URL
+- `src/pages/atasan/Inbox/InboxDetail.jsx` - Changed invoice URL
+- `src/App.tsx` - Enhanced auth state validation
+
+### API Used
+- `PUT /service-requests/{id}` with `{ admin_id, status_id, log_notes }` - Admin approve/reject with admin_id
+- `GET /service-requests/{id}/download-invoice` - Download stored invoice PDF

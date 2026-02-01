@@ -187,15 +187,28 @@ const ServiceDetail = ({ onBack } = {}) => {
     navigate('/services');
   };
 
+  // Computed values
+  const serviceStatus = useMemo(() => {
+    if (!detail) return null;
+    return serviceStatusById.get(Number(detail.status_id)) || null;
+  }, [detail, serviceStatusById]);
+
+  const serviceStatusCode = serviceStatus?.code || '';
+
   const handlePrintInvoice = async () => {
     if (!id || isDownloading) return;
 
     setIsDownloading(true);
-    console.log('[Atasan/ServiceDetail] Downloading invoice for:', id);
 
     try {
       const token = localStorage.getItem('auth_token');
-      const url = buildApiUrl(`/service-requests/${id}/preview-invoice`);
+      // Use preview-invoice for non-COMPLETED status (generates on-the-fly)
+      // Use download-invoice for COMPLETED status (stored Invoice record)
+      const isCompleted = serviceStatusCode === 'COMPLETED';
+      const endpoint = isCompleted ? 'download-invoice' : 'preview-invoice';
+      const url = buildApiUrl(`/service-requests/${id}/${endpoint}`);
+
+      console.log('[Atasan/ServiceDetail] Downloading invoice:', { id, endpoint, status: serviceStatusCode });
 
       const response = await fetch(url, {
         method: 'GET',
@@ -227,12 +240,6 @@ const ServiceDetail = ({ onBack } = {}) => {
       setIsDownloading(false);
     }
   };
-
-  // Computed values
-  const serviceStatus = useMemo(() => {
-    if (!detail) return null;
-    return serviceStatusById.get(Number(detail.status_id)) || null;
-  }, [detail, serviceStatusById]);
 
   const activeLocation = useMemo(
     () => getActiveLocation(locations),
