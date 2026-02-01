@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './Dashboard.css';
 import HeroSection from '../../../components/user/dashboard/HeroSection/HeroSection';
 import RequestList from '../../../components/user/dashboard/RequestList/RequestList';
@@ -154,6 +156,8 @@ const Dashboard = ({ user }) => {
   return (
     <div className="admin-dashboard">
       <HeroSection user={user} mascot={adminMascot} />
+
+      {error && <div className="dashboard-error">{error}</div>}
 
       {isLoading && <div className="admin-dashboard-loading">Loading dashboard...</div>}
 

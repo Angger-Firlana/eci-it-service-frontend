@@ -20,7 +20,7 @@ export const ATASAN_MENU_ITEMS = [
     label: 'Service List',
     icon: listIcon,
     iconActive: listSelectedIcon,
-    route: '/service-list',
+    route: '/service-requests',
   },
   {
     id: 'calendar',

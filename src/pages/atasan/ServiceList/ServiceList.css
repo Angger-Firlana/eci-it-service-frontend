@@ -65,6 +65,15 @@
   font-size: 13px;
 }
 
+.atasan-filter-select {
+  border: 1px solid #D9D9D9;
+  border-radius: 10px;
+  background: #fff;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #6b6b6b;
+}
+
 .atasan-service-table {
   background: #fff;
   border: 1px solid #D9D9D9;
@@ -111,6 +120,26 @@
 
 .atasan-status {
   color: #6b6b6b;
+}
+
+.atasan-status.status-waiting {
+  color: #f39c12;
+  font-weight: 600;
+}
+
+.atasan-status.status-process {
+  color: #2980b9;
+  font-weight: 600;
+}
+
+.atasan-status.status-completed {
+  color: #27ae60;
+  font-weight: 600;
+}
+
+.atasan-status.status-rejected {
+  color: #c0392b;
+  font-weight: 600;
 }
 
 .atasan-actions {

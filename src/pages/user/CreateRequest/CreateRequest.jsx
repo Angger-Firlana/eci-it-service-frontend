@@ -268,7 +268,7 @@ const CreateRequest = () => {
   const handleFieldChange = (field) => (event) => {
     setForm(prev => ({
       ...prev,
-      [field]: event.target.value,
+      [field]: value,
     }));
   };
 
@@ -277,7 +277,7 @@ const CreateRequest = () => {
     setPhotoFile(file || null);
     setForm(prev => ({
       ...prev,
-      photoName: file ? file.name : '',
+      photos: files,
     }));
   };
 
@@ -656,6 +656,11 @@ const CreateRequest = () => {
         })}
       </div>
 
+      {error && <div className="create-request-error">{error}</div>}
+      {successMessage && (
+        <div className="create-request-success">{successMessage}</div>
+      )}
+
       {step === 1 && (
         <>
           <section className="request-card">
@@ -841,8 +846,8 @@ const CreateRequest = () => {
             <label className="upload-box">
               <i className="bi bi-image"></i>
               <span>Klik untuk upload foto</span>
-              {form.photoName && (
-                <span className="upload-name">{form.photoName}</span>
+              {photoLabel && (
+                <span className="upload-name">{photoLabel}</span>
               )}
               <input type="file" accept="image/*" onChange={handlePhotoChange} />
             </label>

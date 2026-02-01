@@ -1,17 +1,17 @@
-.admin-calendar-page {
+.atasan-calendar-page {
   display: flex;
   flex-direction: column;
   gap: 18px;
   font-family: 'Poppins', sans-serif;
 }
 
-.admin-calendar-page h1 {
+.atasan-calendar-page h1 {
   margin: 0;
   font-size: 24px;
   font-weight: 600;
 }
 
-.admin-calendar-error {
+.atasan-calendar-error {
   background: #ffe7e7;
   color: #b40000;
   border-radius: 10px;
@@ -19,33 +19,33 @@
   font-size: 12px;
 }
 
-.admin-calendar-grid {
+.atasan-calendar-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 240px;
   gap: 18px;
   align-items: start;
 }
 
-.admin-calendar-card,
-.admin-calendar-side {
+.atasan-calendar-card,
+.atasan-calendar-side {
   background: #fff;
   border: 1px solid #D9D9D9;
   border-radius: 11px;
   box-shadow: var(--shadow);
 }
 
-.admin-calendar-card {
+.atasan-calendar-card {
   padding: 16px 20px 24px;
 }
 
-.admin-calendar-header {
+.atasan-calendar-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
 }
 
-.admin-calendar-nav {
+.atasan-calendar-nav {
   width: 32px;
   height: 32px;
   border: 0;
@@ -57,13 +57,13 @@
   place-items: center;
 }
 
-.admin-calendar-month {
+.atasan-calendar-month {
   font-size: 16px;
   font-weight: 600;
   color: #000;
 }
 
-.admin-calendar-weekdays {
+.atasan-calendar-weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   text-align: center;
@@ -73,7 +73,7 @@
   margin: 12px 0 8px;
 }
 
-.admin-calendar-days {
+.atasan-calendar-days {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   text-align: center;
@@ -84,7 +84,7 @@
   color: #2b2b2b;
 }
 
-.admin-calendar-day {
+.atasan-calendar-day {
   height: 64px;
   display: flex;
   align-items: center;
@@ -96,11 +96,11 @@
   cursor: pointer;
 }
 
-.admin-calendar-day.selected {
+.atasan-calendar-day.selected {
   border: 1.5px solid #3b3b3b;
 }
 
-.admin-calendar-day.selected::before {
+.atasan-calendar-day.selected::before {
   content: '';
   width: 5px;
   height: 5px;
@@ -112,11 +112,11 @@
   transform: translateX(-50%);
 }
 
-.admin-calendar-day.empty {
+.atasan-calendar-day.empty {
   color: transparent;
 }
 
-.admin-calendar-side {
+.atasan-calendar-side {
   padding: 16px 14px;
   min-height: 260px;
   display: flex;
@@ -124,13 +124,13 @@
   gap: 12px;
 }
 
-.admin-side-date {
+.atasan-side-date {
   font-size: 13px;
   font-weight: 600;
   color: #000;
 }
 
-.admin-side-card {
+.atasan-side-card {
   border: 1px solid #D9D9D9;
   border-radius: 10px;
   padding: 10px 12px;
@@ -144,11 +144,11 @@
   width: 100%;
 }
 
-.admin-side-card:focus {
+.atasan-side-card:focus {
   outline: none;
 }
 
-.admin-side-title-row {
+.atasan-side-title-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -157,23 +157,23 @@
   color: #000;
 }
 
-.admin-side-status {
+.atasan-side-status {
   font-size: 10px;
   color: #FF2D2D;
 }
 
-.admin-side-sub {
+.atasan-side-sub {
   font-size: 11px;
   color: #9D9D9D;
 }
 
-.admin-side-empty {
+.atasan-side-empty {
   font-size: 12px;
   color: #9d9d9d;
 }
 
 @media (max-width: 900px) {
-  .admin-calendar-grid {
+  .atasan-calendar-grid {
     grid-template-columns: 1fr;
   }
 }

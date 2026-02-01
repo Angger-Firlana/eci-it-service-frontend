@@ -65,6 +65,15 @@
   font-size: 13px;
 }
 
+.filter-select {
+  border: 1px solid #D9D9D9;
+  border-radius: 10px;
+  background: #fff;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #6b6b6b;
+}
+
 .service-table-card {
   background: #fff;
   border: 1px solid #D9D9D9;
@@ -121,6 +130,26 @@
 
 .status-selesai {
   color: #6b6b6b;
+}
+
+.status-waiting {
+  color: #f39c12;
+  font-weight: 600;
+}
+
+.status-process {
+  color: #2980b9;
+  font-weight: 600;
+}
+
+.status-completed {
+  color: #27ae60;
+  font-weight: 600;
+}
+
+.status-rejected {
+  color: #c0392b;
+  font-weight: 600;
 }
 
 .service-actions {

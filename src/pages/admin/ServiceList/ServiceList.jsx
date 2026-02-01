@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import './ServiceList.css';
 import eyeIcon from '../../../assets/icons/lihatdetail(eye).svg';
 import { authenticatedRequest } from '../../../lib/api';
@@ -264,11 +266,21 @@ const ServiceList = ({ onViewDetail } = {}) => {
             <span>Service</span>
             <i className="bi bi-chevron-down"></i>
           </button>
-          <button className="admin-filter-btn" type="button">
-            <i className="bi bi-funnel"></i>
-            <span>Status</span>
-            <i className="bi bi-chevron-down"></i>
-          </button>
+          <select
+            className="admin-filter-select"
+            value={statusFilter}
+            onChange={(event) => {
+              setStatusFilter(event.target.value);
+              updateParams({ status: event.target.value, page: 1 });
+            }}
+          >
+            <option value="">Semua Status</option>
+            {statusOptions.map((status) => (
+              <option key={status.id} value={status.id}>
+                {status.name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

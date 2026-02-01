@@ -170,7 +170,17 @@ const ServiceList = () => {
 
       <div className="service-list-controls">
         <div className="search-box">
-          <input type="text" placeholder="" aria-label="Search" />
+          <input
+            type="text"
+            placeholder=""
+            aria-label="Search"
+            value={search}
+            onChange={(event) => {
+              const value = event.target.value;
+              setSearch(value);
+              updateParams({ search: value, page: 1 });
+            }}
+          />
           <i className="bi bi-search"></i>
         </div>
 
@@ -180,11 +190,21 @@ const ServiceList = () => {
             <span>Date</span>
             <i className="bi bi-chevron-down"></i>
           </button>
-          <button className="filter-btn" type="button">
-            <i className="bi bi-funnel"></i>
-            <span>Status</span>
-            <i className="bi bi-chevron-down"></i>
-          </button>
+          <select
+            className="filter-select"
+            value={statusFilter}
+            onChange={(event) => {
+              setStatusFilter(event.target.value);
+              updateParams({ status: event.target.value, page: 1 });
+            }}
+          >
+            <option value="">Semua Status</option>
+            {statusOptions.map((status) => (
+              <option key={status.id} value={status.id}>
+                {status.name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

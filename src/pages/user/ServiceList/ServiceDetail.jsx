@@ -313,8 +313,8 @@ const ServiceDetail = () => {
           </div>
         </section>
 
-        <aside className="timeline-card">
-          <h2>Timeline</h2>
+          <aside className="timeline-card">
+            <h2>Timeline</h2>
 
           {timeline.length > 0 ? (
             <div className="timeline-list">

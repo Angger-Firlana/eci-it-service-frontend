@@ -5,6 +5,14 @@
   font-family: 'Poppins', sans-serif;
 }
 
+.admin-users-error {
+  background: #ffe7e7;
+  color: #b40000;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 12px;
+}
+
 .admin-users-header {
   display: flex;
   align-items: center;
@@ -269,6 +277,12 @@
   padding: 6px 12px;
   font-size: 12px;
   cursor: pointer;
+}
+
+.admin-users-note {
+  font-size: 11px;
+  color: #6b6b6b;
+  text-align: center;
 }
 
 @media (max-width: 900px) {

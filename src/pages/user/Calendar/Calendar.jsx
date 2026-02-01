@@ -173,6 +173,8 @@ const Calendar = () => {
     <div className="calendar-page">
       <h1>Kalender</h1>
 
+      {error && <div className="calendar-error">{error}</div>}
+
       {isLoading && (
         <div className="calendar-loading">Loading calendar data...</div>
       )}
