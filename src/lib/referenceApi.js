@@ -1,4 +1,4 @@
-import { apiRequest, unwrapApiData, parseApiError } from './api';
+import { authenticatedRequest, unwrapApiData, parseApiError } from './api';
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -32,7 +32,7 @@ const fetchList = async (path, cacheKey) => {
   const cached = cacheKey ? readCache(cacheKey) : null;
   if (cached?.length) return cached;
 
-  const res = await apiRequest(path);
+  const res = await authenticatedRequest(path);
   if (!res.ok || res.data?.success === false) {
     throw new Error(parseApiError(res.data, 'Gagal mengambil data.'));
   }

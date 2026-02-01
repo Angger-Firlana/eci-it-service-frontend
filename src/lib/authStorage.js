@@ -1,38 +1,38 @@
-const STORAGE_KEY = 'eci-it-service-auth';
+const TOKEN_KEY = 'auth_token';
+const USER_KEY = 'auth_user';
 
-export const readAuthStorage = () => {
+export const getStoredToken = () => {
   if (typeof window === 'undefined') return null;
-  const raw = window.localStorage.getItem(STORAGE_KEY);
-  if (!raw) return null;
+  return window.localStorage.getItem(TOKEN_KEY);
+};
+
+export const getStoredUser = () => {
+  if (typeof window === 'undefined') return null;
+  const raw = window.localStorage.getItem(USER_KEY);
   try {
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') return null;
-    return parsed;
-  } catch (error) {
+    return raw ? JSON.parse(raw) : null;
+  } catch {
     return null;
   }
 };
 
-export const writeAuthStorage = (payload) => {
+export const setStoredAuth = (token, user) => {
   if (typeof window === 'undefined') return;
-  if (!payload) {
-    window.localStorage.removeItem(STORAGE_KEY);
-    return;
+  if (token) {
+    window.localStorage.setItem(TOKEN_KEY, token);
+  } else {
+    window.localStorage.removeItem(TOKEN_KEY);
   }
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+
+  if (user) {
+    window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+  } else {
+    window.localStorage.removeItem(USER_KEY);
+  }
 };
 
-export const clearAuthStorage = () => {
+export const clearStoredAuth = () => {
   if (typeof window === 'undefined') return;
-  window.localStorage.removeItem(STORAGE_KEY);
-};
-
-export const getStoredToken = () => {
-  const stored = readAuthStorage();
-  return stored?.token || null;
-};
-
-export const getStoredUser = () => {
-  const stored = readAuthStorage();
-  return stored?.user || null;
+  window.localStorage.removeItem(TOKEN_KEY);
+  window.localStorage.removeItem(USER_KEY);
 };

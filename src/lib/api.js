@@ -1,3 +1,5 @@
+import { getStoredToken } from './authStorage';
+
 const normalizeBaseUrl = (baseUrl) => baseUrl.replace(/\/+$/, '');
 
 const resolveBaseUrl = () => {
@@ -70,7 +72,7 @@ export const setUnauthorizedHandler = (callback) => {
 };
 
 export const authenticatedRequest = async (path, options = {}) => {
-  const token = localStorage.getItem('auth_token');
+  const token = getStoredToken();
 
   if (!token) {
     throw new Error('No authentication token found');
@@ -86,4 +88,16 @@ export const authenticatedRequest = async (path, options = {}) => {
   }
 
   return response;
+};
+
+export const parseApiError = (payload, fallback = 'Terjadi kesalahan pada server.') => {
+  if (!payload) return fallback;
+  if (typeof payload === 'string') return payload;
+
+  if (payload.errors && typeof payload.errors === 'object') {
+    const messages = Object.values(payload.errors).flat();
+    if (messages.length > 0) return messages.join(' ');
+  }
+
+  return payload.message || payload.error || fallback;
 };

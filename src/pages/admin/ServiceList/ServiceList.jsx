@@ -1,7 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
 import './ServiceList.css';
 import eyeIcon from '../../../assets/icons/lihatdetail(eye).svg';
 import { authenticatedRequest } from '../../../lib/api';

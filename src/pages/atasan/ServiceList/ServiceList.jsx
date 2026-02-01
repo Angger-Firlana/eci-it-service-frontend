@@ -1,7 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
 import './ServiceList.css';
 import eyeIcon from '../../../assets/icons/lihatdetail(eye).svg';
 import { authenticatedRequest } from '../../../lib/api';
@@ -192,10 +190,10 @@ const ServiceList = () => {
         setPagination(
           meta
             ? {
-                current_page: meta.current_page,
-                last_page: meta.last_page,
-                total: meta.total,
-              }
+              current_page: meta.current_page,
+              last_page: meta.last_page,
+              total: meta.total,
+            }
             : null
         );
 
