@@ -257,3 +257,27 @@ const endpoint = isCompleted ? 'download-invoice' : 'preview-invoice';
 ### API Used
 - `PUT /service-requests/{id}` with `{ admin_id, status_id, log_notes }` - Admin approve/reject with admin_id
 - `GET /service-requests/{id}/download-invoice` - Download stored invoice PDF
+---
+
+## Session: 2026-02-01 - Migrated from Fetch to Axios
+
+### Overview
+Migrated all API calls from native fetch to axios for better error handling and cleaner code.
+
+### Changes Made
+- Installed axios package
+- Rewrote src/lib/api.js to use axios instead of fetch
+- Added downloadFile() helper for file downloads
+- Updated all 4 invoice download handlers to use new helper
+- Maintained exact same API contract (no breaking changes)
+
+### Benefits
+- Automatic JSON transformation
+- Better error handling
+- 30s timeout for requests, 60s for downloads
+- Cleaner code (invoice downloads: 30 lines → 3 lines)
+
+### Bundle Size
+- Before: ~444KB (gzipped: ~119KB)
+- After: ~480KB (gzipped: ~133KB)
+- Increase: +36KB raw, +14KB gzipped

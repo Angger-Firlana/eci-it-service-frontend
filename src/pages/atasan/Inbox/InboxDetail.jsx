@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import '../ServiceList/ServiceDetail.css';
 import backIcon from '../../../assets/icons/back.svg';
-import { authenticatedRequest, unwrapApiData, buildApiUrl } from '../../../lib/api';
+import { authenticatedRequest, unwrapApiData, buildApiUrl, downloadFile } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { getStatusMapsCached } from '../../../lib/referenceCache';
 import {
@@ -316,30 +316,11 @@ const InboxDetail = ({ onBack } = {}) => {
       const isCompleted = serviceStatusCode === 'COMPLETED';
       const endpoint = isCompleted ? 'download-invoice' : 'preview-invoice';
       const url = buildApiUrl(`/service-requests/${id}/${endpoint}`);
+      const filename = `invoice-${detail?.service_number || id}.pdf`;
 
       console.log('[Atasan/InboxDetail] Downloading invoice:', { id, endpoint, status: serviceStatusCode });
 
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Gagal mengunduh invoice');
-      }
-
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = `invoice-${detail?.service_number || id}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(downloadUrl);
+      await downloadFile(url, filename, token);
 
       console.log('[Atasan/InboxDetail] Invoice downloaded successfully');
     } catch (err) {
