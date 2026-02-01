@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import '../ServiceList/ServiceDetail.css';
 import backIcon from '../../../assets/icons/back.svg';
-import { authenticatedRequest, unwrapApiData } from '../../../lib/api';
+import { authenticatedRequest, unwrapApiData, buildApiUrl } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { getStatusMapsCached } from '../../../lib/referenceCache';
 import {
@@ -17,6 +17,16 @@ const APPROVAL_STATUS = {
   APPROVED: 16,
   REJECTED: 17,
 };
+
+// Statuses that allow printing invoice (APPROVED_BY_ADMIN and beyond, except REJECTED/CANCELLED)
+const PRINTABLE_STATUS_CODES = [
+  'APPROVED_BY_ADMIN',
+  'IN_REVIEW_ABOVE',
+  'APPROVED_BY_ABOVE',
+  'REJECTED_BY_ABOVE',
+  'IN_PROGRESS',
+  'COMPLETED',
+];
 
 const formatDateTime = (value) => {
   if (!value) return '-';
@@ -95,6 +105,17 @@ const InboxDetail = ({ onBack } = {}) => {
   const [actionNote, setActionNote] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [actionSuccess, setActionSuccess] = useState('');
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  // Check if invoice can be printed based on status
+  const canPrintInvoice = useMemo(() => {
+    const statusId = detail?.status_id;
+    const statusCode =
+      statusId != null
+        ? serviceStatusById.get(Number(statusId))?.code
+        : detail?.status?.code;
+    return statusCode && PRINTABLE_STATUS_CODES.includes(statusCode);
+  }, [detail?.status_id, detail?.status?.code, serviceStatusById]);
 
   // Find current user's approval from vendor_approvals
   const myApproval = useMemo(() => {
@@ -272,6 +293,47 @@ const InboxDetail = ({ onBack } = {}) => {
       setError(getErrorMessage(err, 'Gagal menolak request'));
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handlePrintInvoice = async () => {
+    if (!id || isDownloading) return;
+
+    setIsDownloading(true);
+    console.log('[Atasan/InboxDetail] Downloading invoice for:', id);
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      const url = buildApiUrl(`/service-requests/${id}/preview-invoice`);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Gagal mengunduh invoice');
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `invoice-${detail?.service_number || id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+
+      console.log('[Atasan/InboxDetail] Invoice downloaded successfully');
+    } catch (err) {
+      console.error('[Atasan/InboxDetail] Invoice download error:', err);
+      alert(err.message || 'Gagal mengunduh invoice');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -700,6 +762,18 @@ const InboxDetail = ({ onBack } = {}) => {
                 ))
               )}
             </div>
+
+            {canPrintInvoice && (
+              <button
+                className="atasan-invoice-btn"
+                type="button"
+                onClick={handlePrintInvoice}
+                disabled={isDownloading}
+              >
+                {isDownloading ? 'Mengunduh...' : 'Cetak Invoice'}
+                <i className="bi bi-printer"></i>
+              </button>
+            )}
           </section>
         </div>
       </div>

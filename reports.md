@@ -41,3 +41,20 @@ Changes 6
 - audit_logs migration: Created migration `2026_01_29_100000_make_audit_logs_status_ids_nullable.php` to make `old_status_id` and `new_status_id` nullable.
 - fix 500: This unblocks `CREATE_VENDOR_APPROVAL` and `UPDATE_VENDOR_APPROVAL` audit log entries which don't involve status changes.
 ----------
+
+Changes 7
+- atasan approval auto-transition: Updated `checkAndUpdateServiceRequestStatus()` in `app/Services/ServiceRequest/ServiceRequestApprovalService.php` so when ALL atasan approvals are no longer pending:
+  - service request transitions to `APPROVED_BY_ABOVE` (status_id = 5)
+  - then auto-transitions to `IN_PROGRESS` (status_id = 7)
+- audit log: Added status audit log entries for BOTH transitions so timeline is consistent.
+- rejection behavior unchanged: If ANY atasan approval is rejected, service request status becomes `REJECTED_BY_ABOVE` (status_id = 6) with audit log.
+----------
+
+Changes 8
+- invoice preview (PDF): Added endpoint to generate invoice PDF on-the-fly (does NOT require stored Invoice record).
+  - `GET /api/service-requests/{id}/preview-invoice` -> returns PDF (auth required)
+  - rule: printable starting from `APPROVED_BY_ADMIN` and later
+  - allowed for `REJECTED_BY_ABOVE` (admin can change vendor and reprocess)
+  - NOT allowed for `REJECTED` and `CANCELLED`
+- note: Stored Invoice creation still happens on `COMPLETED`; preview invoice is independent.
+----------

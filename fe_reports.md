@@ -118,3 +118,70 @@ Implemented all 6 Atasan pages with real API integration, caching, and proper er
 
 ### No Backend Changes Required
 All APIs already existed. No backend modifications were needed.
+
+---
+
+## Session: 2026-02-01 - Invoice Feature & Dashboard Fixes
+
+### Overview
+Completed invoice download functionality for all detail pages and fixed dashboard flickering issue.
+
+### Bug Fix
+- Fixed "Cetak Invoice" not showing on some detail pages because `GET /service-requests/{id}` returns `status` without `code`. UI now derives `status_code` via `status_id` + `getStatusMapsCached({ entityTypeId: 1 })`.
+
+### Changes Made
+
+#### 1. Admin InboxDetail Invoice Download (`src/pages/admin/Inbox/InboxDetail.jsx`)
+- Added `buildApiUrl` import from `../../../lib/api`
+- Added `PRINTABLE_STATUS_CODES` constant for status validation
+- Added `isDownloading` state for download button loading state
+- Added `canPrintInvoice` useMemo to check if current status allows invoice printing
+- Added `handlePrintInvoice` function to download PDF via `GET /service-requests/{id}/preview-invoice`
+- Added "Cetak Invoice" button in timeline card (uses existing `admin-invoice-btn` CSS class)
+
+**Printable Status Codes:**
+- `APPROVED_BY_ADMIN`
+- `IN_REVIEW_ABOVE`
+- `APPROVED_BY_ABOVE`
+- `REJECTED_BY_ABOVE`
+- `IN_PROGRESS`
+- `COMPLETED`
+
+#### 2. Dashboard Flickering Fix (`src/components/user/dashboard/RequestList/RequestList.jsx`)
+- Added `emptyMessage` prop (default: "Belum ada request")
+- Added `hideWhenEmpty` prop (default: false) to optionally hide entire component when empty
+- Added `hasRequests` computed variable to check array validity
+- Added empty state rendering with `request-list-empty` class
+- Prevents flickering by properly handling empty state
+
+**CSS Added (`RequestList.css`):**
+```css
+.request-list-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+  font-size: 14px;
+  font-family: 'Poppins', sans-serif;
+}
+```
+
+#### 3. Atasan Dashboard Cleanup (`src/pages/atasan/Dashboard/Dashboard.jsx`)
+- Removed duplicate empty state div (now handled by RequestList component)
+- Added `emptyMessage` prop to RequestList: "Tidak ada request yang menunggu approval"
+
+### Files Modified
+- `src/pages/admin/Inbox/InboxDetail.jsx` - Added invoice download functionality
+- `src/components/user/dashboard/RequestList/RequestList.jsx` - Added empty state handling
+- `src/components/user/dashboard/RequestList/RequestList.css` - Added empty state styles
+- `src/pages/atasan/Dashboard/Dashboard.jsx` - Removed duplicate empty state
+
+### Invoice Feature Summary (All Pages Complete)
+| Page | Status |
+|------|--------|
+| User ServiceDetail | ✅ Complete |
+| Atasan ServiceDetail | ✅ Complete |
+| Atasan InboxDetail | ✅ Complete |
+| Admin InboxDetail | ✅ Complete |
+
+### API Used
+- `GET /service-requests/{id}/preview-invoice` - Downloads PDF invoice on-the-fly

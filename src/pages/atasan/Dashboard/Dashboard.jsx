@@ -254,13 +254,8 @@ const Dashboard = ({ user }) => {
             onViewAll={handleViewAll}
             onViewDetails={handleViewDetails}
             viewAllLabel="Lihat Semua"
+            emptyMessage="Tidak ada request yang menunggu approval"
           />
-
-          {recentRequests.length === 0 && (
-            <div className="atasan-empty-state">
-              Tidak ada request yang menunggu approval
-            </div>
-          )}
         </>
       )}
     </div>

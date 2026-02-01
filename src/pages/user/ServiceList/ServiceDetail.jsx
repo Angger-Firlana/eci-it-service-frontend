@@ -1,11 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './ServiceDetail.css';
 import backIcon from '../../../assets/icons/back.svg';
-import { authenticatedRequest } from '../../../lib/api';
+import { authenticatedRequest, buildApiUrl } from '../../../lib/api';
+import { getStatusMapsCached } from '../../../lib/referenceCache';
 
 const serviceDetailCache = new Map();
 const SERVICE_DETAIL_CACHE_TTL_MS = 30_000;
+
+// Statuses that allow printing invoice (APPROVED_BY_ADMIN and beyond, except REJECTED/CANCELLED)
+const PRINTABLE_STATUS_CODES = [
+  'APPROVED_BY_ADMIN',
+  'IN_REVIEW_ABOVE',
+  'APPROVED_BY_ABOVE',
+  'REJECTED_BY_ABOVE', // Was approved by admin, can still change vendor
+  'IN_PROGRESS',
+  'COMPLETED',
+];
 
 const ServiceDetail = () => {
   const { id } = useParams();
@@ -16,6 +27,38 @@ const ServiceDetail = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [hasResolved, setHasResolved] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [serviceStatusById, setServiceStatusById] = useState(new Map());
+
+  useEffect(() => {
+    let mounted = true;
+
+    const initStatuses = async () => {
+      try {
+        const serviceStatuses = await getStatusMapsCached({ entityTypeId: 1 });
+        if (!mounted) return;
+        setServiceStatusById(serviceStatuses.byId);
+      } catch (err) {
+        console.error('[User/ServiceDetail] Failed to load status maps:', err);
+      }
+    };
+
+    initStatuses();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const serviceStatusCode = useMemo(() => {
+    const statusId = detail?.status_id;
+    if (statusId == null) return detail?.status?.code || null;
+    return serviceStatusById.get(Number(statusId))?.code || detail?.status?.code || null;
+  }, [detail?.status_id, detail?.status?.code, serviceStatusById]);
+
+  // Check if invoice can be printed based on status
+  const canPrintInvoice = useMemo(() => {
+    return serviceStatusCode && PRINTABLE_STATUS_CODES.includes(serviceStatusCode);
+  }, [serviceStatusCode]);
 
   useEffect(() => {
     setHasResolved(false);
@@ -110,6 +153,48 @@ const ServiceDetail = () => {
     const date = new Date(dateString);
     const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
     return date.toLocaleDateString('id-ID', options);
+  };
+
+  const handlePrintInvoice = async () => {
+    if (!id || isDownloading) return;
+
+    setIsDownloading(true);
+    console.log('[User/ServiceDetail] Downloading invoice for:', id);
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      const url = buildApiUrl(`/service-requests/${id}/preview-invoice`);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Gagal mengunduh invoice');
+      }
+
+      // Get the blob and create download link
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `invoice-${detail?.service_number || id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+
+      console.log('[User/ServiceDetail] Invoice downloaded successfully');
+    } catch (err) {
+      console.error('[User/ServiceDetail] Invoice download error:', err);
+      alert(err.message || 'Gagal mengunduh invoice');
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   if (isLoading) {
@@ -254,10 +339,17 @@ const ServiceDetail = () => {
             <div className="timeline-empty">No timeline available</div>
           )}
 
-          <button className="invoice-btn" type="button">
-            Cetak Invoice
-            <i className="bi bi-printer"></i>
-          </button>
+          {canPrintInvoice && (
+            <button
+              className="invoice-btn"
+              type="button"
+              onClick={handlePrintInvoice}
+              disabled={isDownloading}
+            >
+              {isDownloading ? 'Mengunduh...' : 'Cetak Invoice'}
+              <i className="bi bi-printer"></i>
+            </button>
+          )}
         </aside>
       </div>
     </div>

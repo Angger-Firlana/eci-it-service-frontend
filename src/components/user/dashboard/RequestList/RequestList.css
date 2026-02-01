@@ -42,3 +42,11 @@
   padding-top: 8px;
   overflow: visible;
 }
+
+.request-list-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+  font-size: 14px;
+  font-family: 'Poppins', sans-serif;
+}

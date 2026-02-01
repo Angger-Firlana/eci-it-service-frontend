@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import './InboxDetail.css';
 import backIcon from '../../../assets/icons/back.svg';
 import { Modal } from '../../../components/common';
-import { authenticatedRequest, unwrapApiData } from '../../../lib/api';
+import { authenticatedRequest, unwrapApiData, buildApiUrl } from '../../../lib/api';
 import {
   getCostTypesCached,
   getStatusMapsCached,
@@ -14,6 +14,16 @@ import {
   getServiceRequestLocationsCached,
   invalidateServiceRequestCache,
 } from '../../../lib/serviceRequestCache';
+
+// Statuses that allow printing invoice (APPROVED_BY_ADMIN and beyond, except REJECTED/CANCELLED)
+const PRINTABLE_STATUS_CODES = [
+  'APPROVED_BY_ADMIN',
+  'IN_REVIEW_ABOVE',
+  'APPROVED_BY_ABOVE',
+  'REJECTED_BY_ABOVE',
+  'IN_PROGRESS',
+  'COMPLETED',
+];
 
 const formatDateTime = (value) => {
   if (!value) return '-';
@@ -148,6 +158,7 @@ const AdminInboxDetail = ({ onBack } = {}) => {
   const [pendingVendorSubmit, setPendingVendorSubmit] = useState(null);
 
   const [isCompleteModalOpen, setCompleteModalOpen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const refresh = async () => {
     if (!id) return;
@@ -216,7 +227,13 @@ const AdminInboxDetail = ({ onBack } = {}) => {
     return serviceStatusById.get(Number(detail.status_id)) || null;
   }, [detail, serviceStatusById]);
 
-  const serviceStatusCode = serviceStatus?.code || '';
+const serviceStatusCode = serviceStatus?.code || '';
+
+  // Check if invoice can be printed based on status
+  const canPrintInvoice = useMemo(() => {
+    return serviceStatusCode && PRINTABLE_STATUS_CODES.includes(serviceStatusCode);
+  }, [serviceStatusCode]);
+
   const needsAdminApprove =
     serviceStatusCode === 'PENDING' || serviceStatusCode === 'IN_REVIEW_ADMIN';
   const needsLocationSet = serviceStatusCode === 'APPROVED_BY_ADMIN';
@@ -827,8 +844,45 @@ const AdminInboxDetail = ({ onBack } = {}) => {
       await refresh();
     } catch (err) {
       setError(err.message || 'Gagal menyelesaikan service');
-    } finally {
+} finally {
       setIsSaving(false);
+    }
+  };
+
+  const handlePrintInvoice = async () => {
+    if (!id || isDownloading) return;
+
+    setIsDownloading(true);
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      const url = buildApiUrl(`/service-requests/${id}/preview-invoice`);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Gagal mengunduh invoice');
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `invoice-${detail?.service_number || id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      alert(err.message || 'Gagal mengunduh invoice');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -1279,9 +1333,21 @@ const AdminInboxDetail = ({ onBack } = {}) => {
                       <span className="admin-timeline-desc">{item.note}</span>
                     </div>
                   </div>
-                ))
+))
               )}
             </div>
+
+            {canPrintInvoice && (
+              <button
+                className="admin-invoice-btn"
+                type="button"
+                onClick={handlePrintInvoice}
+                disabled={isDownloading}
+              >
+                {isDownloading ? 'Mengunduh...' : 'Cetak Invoice'}
+                <i className="bi bi-printer"></i>
+              </button>
+            )}
           </section>
         </div>
       </div>

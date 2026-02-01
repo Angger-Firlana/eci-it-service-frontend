@@ -8,7 +8,16 @@ const RequestList = ({
   onViewDetails,
   title = 'Request Terbaru',
   viewAllLabel = 'Lihat Semua',
+  emptyMessage = 'Belum ada request',
+  hideWhenEmpty = false,
 }) => {
+  const hasRequests = Array.isArray(requests) && requests.length > 0;
+
+  // If hideWhenEmpty is true and there are no requests, don't render anything
+  if (hideWhenEmpty && !hasRequests) {
+    return null;
+  }
+
   return (
     <section className="panel">
       <div className="panel-head">
@@ -19,13 +28,17 @@ const RequestList = ({
       </div>
 
       <div className="request-list">
-        {requests.map((request) => (
-          <RequestItem
-            key={request.id}
-            item={request}
-            onViewDetails={onViewDetails}
-          />
-        ))}
+        {hasRequests ? (
+          requests.map((request) => (
+            <RequestItem
+              key={request.id}
+              item={request}
+              onViewDetails={onViewDetails}
+            />
+          ))
+        ) : (
+          <div className="request-list-empty">{emptyMessage}</div>
+        )}
       </div>
     </section>
   );
