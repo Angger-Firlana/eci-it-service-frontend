@@ -168,34 +168,6 @@ const Login = () => {
             {isLoading ? 'Logging in...' : 'Login'}
           </button>
         </form>
-
-        <div className="login-alt" aria-label="Dev login shortcuts">
-          <button
-            type="button"
-            className="login-alt-btn"
-            onClick={() => handleDummyLogin('user')}
-            disabled={isLoading}
-          >
-            Login sebagai User
-          </button>
-          <button
-            type="button"
-            className="login-alt-btn"
-            onClick={() => handleDummyLogin('atasan')}
-            disabled={isLoading}
-          >
-            Login sebagai Atasan
-          </button>
-          <button
-            type="button"
-            className="login-alt-btn"
-            onClick={() => handleDummyLogin('admin')}
-            disabled={isLoading}
-          >
-            Login sebagai Admin
-          </button>
-        </div>
-
         <img src={robotImg} alt="" className="login-robot" aria-hidden="true" />
       </div>
     </div>
