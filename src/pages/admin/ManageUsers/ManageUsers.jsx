@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import './ManageUsers.css';
 
 import { Modal } from '../../../components/common';
+import { PageHeader, SearchBox } from '../../../components/ui';
 import { authenticatedRequest, unwrapApiData } from '../../../lib/api';
 import globalCache from '../../../lib/globalCache';
 
@@ -439,12 +440,15 @@ const ManageUsers = () => {
 
   return (
     <div className="admin-users-page">
-      <div className="admin-users-header">
-        <h1>Kelola User</h1>
-        <button className="admin-users-add" type="button" onClick={openCreate}>
-          <span>+ Tambah</span>
-        </button>
-      </div>
+      <PageHeader
+        className="admin-users-header"
+        title="Kelola User"
+        actions={
+          <button className="admin-users-add" type="button" onClick={openCreate}>
+            <span>+ Tambah</span>
+          </button>
+        }
+      />
 
       <div className="admin-users-layout">
         <section className="admin-users-table-card">
@@ -486,16 +490,13 @@ const ManageUsers = () => {
             </div>
 
             <div className="admin-users-controls">
-              <div className="admin-search-box">
-                <input
-                  type="text"
-                  placeholder="Cari nama"
-                  aria-label="Search"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                />
-                <i className="bi bi-search"></i>
-              </div>
+              <SearchBox
+                className="admin-search-box"
+                placeholder="Cari nama"
+                ariaLabel="Search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
 
               <select
                 className="admin-filter-select"

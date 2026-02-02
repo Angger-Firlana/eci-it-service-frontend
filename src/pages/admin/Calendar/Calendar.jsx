@@ -5,6 +5,7 @@ import { authenticatedRequest } from '../../../lib/api';
 import { getStatusMapsCached } from '../../../lib/referenceCache';
 import { getServiceRequestDetailCached } from '../../../lib/serviceRequestCache';
 import globalCache from '../../../lib/globalCache';
+import { PageHeader } from '../../../components/ui';
 
 const MONTHS = [
   'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -253,7 +254,7 @@ const Calendar = () => {
 
   return (
     <div className="admin-calendar-page">
-      <h1>Kalender</h1>
+      <PageHeader title="Kalender" />
 
       <div className="admin-calendar-grid">
         <section className="admin-calendar-card">

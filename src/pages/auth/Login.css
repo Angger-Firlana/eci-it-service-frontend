@@ -136,3 +136,19 @@
     margin: 18px auto;
   }
 }
+
+@media (max-width: 520px) {
+  .login-page {
+    justify-content: center;
+  }
+
+  .login-card {
+    width: min(360px, 94vw);
+    margin: 14px auto;
+    padding: 28px 22px 22px;
+  }
+
+  .login-robot {
+    align-self: center;
+  }
+}

@@ -8,6 +8,8 @@ import {
   getServiceRequestCostsTotalCached,
   getServiceRequestLocationsCached,
 } from '../../../lib/serviceRequestCache';
+import { PageHeader, SearchBox } from '../../../components/ui';
+import globalCache from '../../../lib/globalCache';
 
 // Vendor approval status IDs (entity_type_id = 2)
 const APPROVAL_STATUS = {
@@ -133,6 +135,15 @@ const Inbox = () => {
     let cancelled = false;
 
     const fetchInbox = async () => {
+      const cacheKey = `atasan-inbox:${statusFilter}`;
+      const cached = globalCache.get(cacheKey);
+
+      if (cached) {
+        setItems(cached.items || cached);
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       setError('');
 
@@ -227,6 +238,7 @@ const Inbox = () => {
 
         if (cancelled) return;
         setItems(enrichedRows);
+        globalCache.set(cacheKey, { items: enrichedRows }, 30_000);
         console.log('[Atasan/Inbox] Inbox loaded successfully');
       } catch (err) {
         if (err?.name === 'AbortError') return;
@@ -254,21 +266,16 @@ const Inbox = () => {
 
   return (
     <div className="atasan-service-list">
-      <div className="atasan-service-header">
-        <h1>Inbox Request</h1>
-      </div>
+      <PageHeader className="atasan-service-header" title="Inbox Request" />
 
       <div className="atasan-service-controls">
-        <div className="atasan-search-box">
-          <input
-            type="text"
-            placeholder="Cari request..."
-            aria-label="Search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <i className="bi bi-search"></i>
-        </div>
+        <SearchBox
+          className="atasan-search-box"
+          placeholder="Cari request..."
+          ariaLabel="Search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
 
         <div className="atasan-filter-group">
           <select
@@ -309,12 +316,12 @@ const Inbox = () => {
           ) : (
             filteredItems.map((row) => (
               <div className="atasan-service-row" key={row.approvalId}>
-                <div className="atasan-code">{row.code}</div>
-                <div>{row.device}</div>
-                <div>{row.model}</div>
-                <div>{row.service}</div>
-                <div>{row.location}</div>
-                <div>
+                <div className="atasan-code" data-label="Kode">{row.code}</div>
+                <div data-label="Perangkat">{row.device}</div>
+                <div data-label="Model">{row.model}</div>
+                <div data-label="Service">{row.service}</div>
+                <div data-label="Lokasi">{row.location}</div>
+                <div data-label="Tanggal">
                   <input
                     className="atasan-date-input"
                     type="text"
@@ -322,11 +329,14 @@ const Inbox = () => {
                     readOnly
                   />
                 </div>
-                <div className="atasan-cost">{row.cost}</div>
-                <div className={`atasan-status atasan-status-${row.statusId === APPROVAL_STATUS.PENDING ? 'pending' : row.statusId === APPROVAL_STATUS.APPROVED ? 'approved' : 'rejected'}`}>
+                <div className="atasan-cost" data-label="Biaya">{row.cost}</div>
+                <div
+                  data-label="Status"
+                  className={`atasan-status atasan-status-${row.statusId === APPROVAL_STATUS.PENDING ? 'pending' : row.statusId === APPROVAL_STATUS.APPROVED ? 'approved' : 'rejected'}`}
+                >
                   {row.status}
                 </div>
-                <div className="atasan-actions">
+                <div className="atasan-actions" data-label="Aksi">
                   <button className="atasan-ellipsis" type="button" aria-label="Menu">
                     ...
                   </button>

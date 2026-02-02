@@ -122,3 +122,21 @@
 .um-logout i {
   font-size: 16px;
 }
+
+@media (max-width: 720px) {
+  .topbar {
+    justify-content: space-between;
+    padding: 4px 0;
+  }
+
+  .user-menu {
+    width: 260px;
+  }
+}
+
+@media (max-width: 520px) {
+  .user-menu {
+    width: 220px;
+    right: 0;
+  }
+}

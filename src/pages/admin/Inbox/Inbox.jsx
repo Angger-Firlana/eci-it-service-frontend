@@ -6,6 +6,7 @@ import { authenticatedRequest, unwrapApiData } from '../../../lib/api';
 import { getStatusMapsCached } from '../../../lib/referenceCache';
 import { getServiceRequestDetailCached } from '../../../lib/serviceRequestCache';
 import globalCache from '../../../lib/globalCache';
+import { PageHeader, SearchBox } from '../../../components/ui';
 
 const formatDate = (value) => {
   if (!value) return '-';
@@ -201,21 +202,16 @@ const Inbox = () => {
 
   return (
     <div className="admin-inbox-page">
-      <div className="admin-inbox-header">
-        <h1>Inbox Request</h1>
-      </div>
+      <PageHeader className="admin-inbox-header" title="Inbox Request" />
 
       <div className="admin-inbox-controls">
-        <div className="admin-search-box">
-          <input
-            type="text"
-            placeholder="Cari request"
-            aria-label="Search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-          <i className="bi bi-search"></i>
-        </div>
+        <SearchBox
+          className="admin-search-box"
+          placeholder="Cari request"
+          ariaLabel="Search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
 
         <button className="admin-filter-btn" type="button" disabled>
           <i className="bi bi-funnel"></i>
@@ -247,11 +243,11 @@ const Inbox = () => {
               const status = statusById.get(Number(row?.status_id)) || row?.status;
               return (
                 <div className="admin-inbox-row" key={row.id}>
-                  <div className="admin-code">{row.service_number || `SR-${row.id}`}</div>
-                  <div>{getDeviceLabel(row)}</div>
-                  <div>{getModelLabel(row)}</div>
-                  <div>{getServiceLabel(row)}</div>
-                  <div>
+                  <div className="admin-code" data-label="Kode">{row.service_number || `SR-${row.id}`}</div>
+                  <div data-label="Perangkat">{getDeviceLabel(row)}</div>
+                  <div data-label="Model">{getModelLabel(row)}</div>
+                  <div data-label="Service">{getServiceLabel(row)}</div>
+                  <div data-label="Tanggal">
                     <input
                       className="admin-date-input"
                       type="text"
@@ -259,8 +255,8 @@ const Inbox = () => {
                       readOnly
                     />
                   </div>
-                  <div className="admin-status">{status?.name || '-'}</div>
-                  <div className="admin-actions">
+                  <div className="admin-status" data-label="Status">{status?.name || '-'}</div>
+                  <div className="admin-actions" data-label="Aksi">
                     <button className="admin-ellipsis" type="button" aria-label="Menu" disabled>
                       ...
                     </button>

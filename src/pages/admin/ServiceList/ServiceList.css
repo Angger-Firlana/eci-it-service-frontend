@@ -157,6 +157,54 @@
   }
 }
 
+@media (max-width: 720px) {
+  .admin-service-controls {
+    width: 100%;
+  }
+
+  .admin-search-box {
+    width: 100%;
+  }
+
+  .admin-filter-group {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .admin-service-table {
+    overflow: hidden;
+  }
+
+  .admin-service-head {
+    display: none;
+  }
+
+  .admin-service-row {
+    min-width: 0;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 14px;
+  }
+
+  .admin-service-row > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .admin-service-row > div::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #9D9D9D;
+    flex: 0 0 120px;
+  }
+
+  .admin-actions {
+    justify-content: flex-start;
+  }
+}
+
 .admin-service-loading,
 .admin-service-error {
   background: #fff;

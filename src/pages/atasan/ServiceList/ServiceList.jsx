@@ -8,6 +8,8 @@ import {
   getServiceRequestDetailCached,
   getServiceRequestLocationsCached,
 } from '../../../lib/serviceRequestCache';
+import { PageHeader, SearchBox, TablePagination } from '../../../components/ui';
+import globalCache from '../../../lib/globalCache';
 
 const PER_PAGE = 10;
 
@@ -109,6 +111,16 @@ const ServiceList = () => {
     let cancelled = false;
 
     const fetchServices = async () => {
+      const cacheKey = `atasan-service-list:${currentPage}:${querySearch}`;
+      const cached = globalCache.get(cacheKey);
+
+      if (cached) {
+        setRows(cached.rows || []);
+        setPagination(cached.pagination || null);
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       setError('');
 
@@ -186,16 +198,17 @@ const ServiceList = () => {
         });
 
         if (cancelled) return;
+        const paginationData = meta
+          ? {
+              current_page: meta.current_page,
+              last_page: meta.last_page,
+              total: meta.total,
+            }
+          : null;
+
         setRows(computedRows);
-        setPagination(
-          meta
-            ? {
-                current_page: meta.current_page,
-                last_page: meta.last_page,
-                total: meta.total,
-              }
-            : null
-        );
+        setPagination(paginationData);
+        globalCache.set(cacheKey, { rows: computedRows, pagination: paginationData }, 30_000);
 
         console.log('[Atasan/ServiceList] Loaded successfully');
       } catch (err) {
@@ -249,34 +262,17 @@ const ServiceList = () => {
 
   return (
     <div className="atasan-service-list">
-      <div className="atasan-service-header">
-        <h1>Service List</h1>
-      </div>
+      <PageHeader className="atasan-service-header" title="Service List" />
 
       <div className="atasan-service-controls">
-        <div className="atasan-search-box">
-          <input
-            type="text"
-            placeholder="Cari service..."
-            aria-label="Search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                applySearch();
-              }
-            }}
-          />
-          <i
-            className="bi bi-search"
-            onClick={applySearch}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') applySearch();
-            }}
-          />
-        </div>
+        <SearchBox
+          className="atasan-search-box"
+          placeholder="Cari service..."
+          ariaLabel="Search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onSearch={applySearch}
+        />
 
         <div className="atasan-filter-group">
           <button className="atasan-filter-btn" type="button" disabled>
@@ -323,17 +319,17 @@ const ServiceList = () => {
             ) : (
               rows.map((row) => (
                 <div className="atasan-service-row" key={row.id}>
-                  <div className="atasan-code">{row.code}</div>
-                  <div>{row.device}</div>
-                  <div>{row.model}</div>
-                  <div>{row.service}</div>
-                  <div>{row.location}</div>
-                  <div>
+                  <div className="atasan-code" data-label="Kode">{row.code}</div>
+                  <div data-label="Perangkat">{row.device}</div>
+                  <div data-label="Model">{row.model}</div>
+                  <div data-label="Service">{row.service}</div>
+                  <div data-label="Lokasi">{row.location}</div>
+                  <div data-label="Tanggal">
                     <input className="atasan-date-input" type="text" value={row.date} readOnly />
                   </div>
-                  <div className="atasan-cost">{row.cost}</div>
-                  <div className="atasan-status">{row.status}</div>
-                  <div className="atasan-actions">
+                  <div className="atasan-cost" data-label="Biaya">{row.cost}</div>
+                  <div className="atasan-status" data-label="Status">{row.status}</div>
+                  <div className="atasan-actions" data-label="Aksi">
                     <button className="atasan-ellipsis" type="button" aria-label="Menu" disabled>
                       ...
                     </button>
@@ -352,31 +348,17 @@ const ServiceList = () => {
           </div>
 
           {pagination && pagination.last_page > 1 && (
-            <div className="atasan-pagination">
-              <button
-                className="atasan-pagination-btn"
-                type="button"
-                onClick={() => setPage(currentPage - 1)}
-                disabled={!canGoPrev}
-              >
-                <i className="bi bi-chevron-left"></i>
-                Prev
-              </button>
-
-              <span className="atasan-pagination-info">
-                Page {pagination.current_page} of {pagination.last_page}
-              </span>
-
-              <button
-                className="atasan-pagination-btn"
-                type="button"
-                onClick={() => setPage(currentPage + 1)}
-                disabled={!canGoNext}
-              >
-                Next
-                <i className="bi bi-chevron-right"></i>
-              </button>
-            </div>
+            <TablePagination
+              wrapperClassName="atasan-pagination"
+              buttonClassName="atasan-pagination-btn"
+              infoClassName="atasan-pagination-info"
+              currentPage={pagination.current_page}
+              totalPages={pagination.last_page}
+              onPrev={() => setPage(currentPage - 1)}
+              onNext={() => setPage(currentPage + 1)}
+              disablePrev={!canGoPrev}
+              disableNext={!canGoNext}
+            />
           )}
         </>
       )}

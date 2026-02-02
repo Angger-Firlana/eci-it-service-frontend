@@ -249,3 +249,18 @@
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 520px) {
+  .calendar-card {
+    padding: 14px 16px 18px;
+  }
+
+  .calendar-day {
+    height: 42px;
+  }
+
+  .calendar-legend {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

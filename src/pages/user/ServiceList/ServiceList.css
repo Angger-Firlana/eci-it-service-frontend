@@ -221,3 +221,58 @@
     grid-auto-rows: auto;
   }
 }
+
+@media (max-width: 720px) {
+  .service-list-controls {
+    width: 100%;
+  }
+
+  .search-box {
+    width: 100%;
+  }
+
+  .filter-group {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .service-table-card {
+    overflow: hidden;
+  }
+
+  .service-table-head {
+    display: none;
+  }
+
+  .service-table-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 14px;
+  }
+
+  .service-table-row > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .service-table-row > div::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #9D9D9D;
+    flex: 0 0 120px;
+  }
+
+  .date-pill {
+    width: 100%;
+  }
+
+  .service-actions {
+    justify-content: flex-start;
+  }
+
+  .service-actions::before {
+    align-self: center;
+  }
+}

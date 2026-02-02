@@ -50,3 +50,52 @@
   height: 100%;
   object-fit: contain;
 }
+
+@media (max-width: 900px) {
+  .hero {
+    height: auto;
+    padding: 24px;
+  }
+
+  .hero-title {
+    font-size: 34px;
+  }
+
+  .hero-subtitle {
+    font-size: 18px;
+  }
+
+  .hero-meta {
+    position: static;
+    margin-top: 16px;
+  }
+
+  .hero-mascot {
+    width: 150px;
+    height: 150px;
+    right: 18px;
+    top: 18px;
+  }
+}
+
+@media (max-width: 520px) {
+  .hero-title {
+    font-size: 26px;
+  }
+
+  .hero-subtitle {
+    font-size: 16px;
+  }
+
+  .hero-meta {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .hero-mascot {
+    position: static;
+    margin-top: 12px;
+    width: 120px;
+    height: 120px;
+  }
+}

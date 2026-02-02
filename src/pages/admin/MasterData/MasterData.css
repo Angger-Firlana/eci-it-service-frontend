@@ -246,3 +246,24 @@
     min-width: 520px;
   }
 }
+
+@media (max-width: 720px) {
+  .admin-master-tabs {
+    flex-wrap: wrap;
+    position: static;
+    margin-bottom: 12px;
+  }
+
+  .admin-master-card {
+    padding-top: 18px;
+  }
+
+  .admin-master-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .admin-search-box {
+    width: 100%;
+  }
+}

@@ -9,6 +9,7 @@ import {
   getServiceRequestLocationsCached,
 } from '../../../lib/serviceRequestCache';
 import globalCache from '../../../lib/globalCache';
+import { PageHeader, SearchBox, TablePagination } from '../../../components/ui';
 
 const PER_PAGE = 10;
 
@@ -248,26 +249,17 @@ const ServiceList = ({ onViewDetail } = {}) => {
 
   return (
     <div className="admin-service-list">
-      <div className="admin-service-header">
-        <h1>Service List</h1>
-      </div>
+      <PageHeader className="admin-service-header" title="Service List" />
 
       <div className="admin-service-controls">
-        <div className="admin-search-box">
-          <input
-            type="text"
-            placeholder=""
-            aria-label="Search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                applySearch();
-              }
-            }}
-          />
-          <i className="bi bi-search" onClick={applySearch} role="button" tabIndex={0} />
-        </div>
+        <SearchBox
+          className="admin-search-box"
+          placeholder=""
+          ariaLabel="Search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onSearch={applySearch}
+        />
 
         <div className="admin-filter-group">
           <button className="admin-filter-btn" type="button">
@@ -316,17 +308,17 @@ const ServiceList = ({ onViewDetail } = {}) => {
 
             {rows.map((row) => (
               <div className="admin-service-row" key={row.id}>
-                <div className="admin-code">{row.code}</div>
-                <div>{row.device}</div>
-                <div>{row.model}</div>
-                <div>{row.service}</div>
-                <div>{row.location}</div>
-                <div>
+                <div className="admin-code" data-label="Kode">{row.code}</div>
+                <div data-label="Perangkat">{row.device}</div>
+                <div data-label="Model">{row.model}</div>
+                <div data-label="Service">{row.service}</div>
+                <div data-label="Lokasi">{row.location}</div>
+                <div data-label="Tanggal">
                   <input className="admin-date-input" type="text" value={row.date} readOnly />
                 </div>
-                <div className="admin-cost">{row.cost}</div>
-                <div className="admin-status">{row.status}</div>
-                <div className="admin-actions">
+                <div className="admin-cost" data-label="Biaya">{row.cost}</div>
+                <div className="admin-status" data-label="Status">{row.status}</div>
+                <div className="admin-actions" data-label="Aksi">
                   <button className="admin-ellipsis" type="button" aria-label="Menu">
                     ...
                   </button>
@@ -348,31 +340,17 @@ const ServiceList = ({ onViewDetail } = {}) => {
           </div>
 
           {pagination && pagination.last_page > 1 && (
-            <div className="admin-pagination">
-              <button
-                className="admin-pagination-btn"
-                type="button"
-                onClick={() => setPage(currentPage - 1)}
-                disabled={!canGoPrev}
-              >
-                <i className="bi bi-chevron-left"></i>
-                Prev
-              </button>
-
-              <span className="admin-pagination-info">
-                Page {pagination.current_page} of {pagination.last_page}
-              </span>
-
-              <button
-                className="admin-pagination-btn"
-                type="button"
-                onClick={() => setPage(currentPage + 1)}
-                disabled={!canGoNext}
-              >
-                Next
-                <i className="bi bi-chevron-right"></i>
-              </button>
-            </div>
+            <TablePagination
+              wrapperClassName="admin-pagination"
+              buttonClassName="admin-pagination-btn"
+              infoClassName="admin-pagination-info"
+              currentPage={pagination.current_page}
+              totalPages={pagination.last_page}
+              onPrev={() => setPage(currentPage - 1)}
+              onNext={() => setPage(currentPage + 1)}
+              disablePrev={!canGoPrev}
+              disableNext={!canGoNext}
+            />
           )}
         </>
       )}

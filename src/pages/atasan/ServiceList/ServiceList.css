@@ -160,6 +160,54 @@
   }
 }
 
+@media (max-width: 720px) {
+  .atasan-service-controls {
+    width: 100%;
+  }
+
+  .atasan-search-box {
+    width: 100%;
+  }
+
+  .atasan-filter-group {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .atasan-service-table {
+    overflow: hidden;
+  }
+
+  .atasan-service-head {
+    display: none;
+  }
+
+  .atasan-service-row {
+    min-width: 0;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 14px;
+  }
+
+  .atasan-service-row > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .atasan-service-row > div::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #9D9D9D;
+    flex: 0 0 120px;
+  }
+
+  .atasan-actions {
+    justify-content: flex-start;
+  }
+}
+
 /* Filter select dropdown */
 .atasan-filter-select {
   border: 1px solid #D9D9D9;

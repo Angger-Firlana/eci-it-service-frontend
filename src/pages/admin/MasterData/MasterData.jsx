@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './MasterData.css';
 import { Modal } from '../../../components/common';
+import { PageHeader, SearchBox } from '../../../components/ui';
 import { authenticatedRequest, unwrapApiData, API_BASE_URL } from '../../../lib/api';
 import globalCache from '../../../lib/globalCache';
 
@@ -860,7 +861,7 @@ const MasterData = () => {
 
   return (
     <div className="admin-master-page">
-      <h1>Master Data</h1>
+      <PageHeader title="Master Data" />
 
       <section className="admin-master-card">
         <div className="admin-master-tabs">
@@ -930,7 +931,7 @@ const MasterData = () => {
             )}
           </div>
 
-            <div className="admin-master-actions">
+          <div className="admin-master-actions">
             {activeTab === 'model' && (
               <>
                 <button className="admin-filter-btn" type="button">
@@ -950,45 +951,39 @@ const MasterData = () => {
                 activeTab === 'service' ||
                 activeTab === 'vendor' ||
                 activeTab === 'department') && (
-                <div className="admin-search-box">
-                  <input
-                    type="text"
-                    placeholder="Cari"
-                    aria-label="Search"
-                    value={
-                      activeTab === 'model'
-                        ? modelSearch
-                        : activeTab === 'service'
-                        ? serviceSearch
-                        : activeTab === 'vendor'
-                        ? vendorSearch
-                        : departmentSearch
-                    }
-                    onChange={(event) =>
-                      activeTab === 'model'
-                        ? setModelSearch(event.target.value)
-                        : activeTab === 'service'
-                        ? setServiceSearch(event.target.value)
-                        : activeTab === 'vendor'
-                        ? setVendorSearch(event.target.value)
-                        : setDepartmentSearch(event.target.value)
-                    }
-                  />
-                  <i className="bi bi-search"></i>
-                </div>
+                <SearchBox
+                  className="admin-search-box"
+                  placeholder="Cari"
+                  ariaLabel="Search"
+                  value={
+                    activeTab === 'model'
+                      ? modelSearch
+                      : activeTab === 'service'
+                      ? serviceSearch
+                      : activeTab === 'vendor'
+                      ? vendorSearch
+                      : departmentSearch
+                  }
+                  onChange={(event) =>
+                    activeTab === 'model'
+                      ? setModelSearch(event.target.value)
+                      : activeTab === 'service'
+                      ? setServiceSearch(event.target.value)
+                      : activeTab === 'vendor'
+                      ? setVendorSearch(event.target.value)
+                      : setDepartmentSearch(event.target.value)
+                  }
+                />
               )}
 
             {activeTab === 'device' && (
-              <div className="admin-search-box">
-                <input
-                  type="text"
-                  placeholder="Cari"
-                  aria-label="Search"
-                  value={deviceSearch}
-                  onChange={(event) => setDeviceSearch(event.target.value)}
-                />
-                <i className="bi bi-search"></i>
-              </div>
+              <SearchBox
+                className="admin-search-box"
+                placeholder="Cari"
+                ariaLabel="Search"
+                value={deviceSearch}
+                onChange={(event) => setDeviceSearch(event.target.value)}
+              />
             )}
 
             <button

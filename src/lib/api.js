@@ -141,6 +141,9 @@ export const authenticatedRequest = async (path, options = {}) => {
   const token = localStorage.getItem('auth_token');
 
   if (!token) {
+    if (onUnauthorizedCallback) {
+      onUnauthorizedCallback();
+    }
     throw new Error('No authentication token found');
   }
 

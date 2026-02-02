@@ -27,6 +27,20 @@
   }
 }
 
+@media (max-width: 720px) {
+  .app {
+    gap: 12px;
+  }
+
+  .main {
+    gap: 12px;
+  }
+
+  .content {
+    gap: 12px;
+  }
+}
+
 @media (max-width: 520px) {
   .app {
     grid-template-columns: var(--sidebarMini) 1fr;

@@ -6,6 +6,7 @@ import { authenticatedRequest } from '../../../lib/api';
 import { useServiceCache } from '../../../contexts/ServiceCacheContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { getServiceRequestDetailCached } from '../../../lib/serviceRequestCache';
+import { PageHeader, SearchBox, TablePagination } from '../../../components/ui';
 
 const ServiceList = () => {
   const { user } = useAuth();
@@ -140,9 +141,7 @@ const ServiceList = () => {
   if (isLoading) {
     return (
       <div className="service-list-page">
-        <div className="service-list-header">
-          <h1>Service List</h1>
-        </div>
+        <PageHeader className="service-list-header" title="Service List" />
         <div className="service-list-loading">Loading services...</div>
       </div>
     );
@@ -151,9 +150,7 @@ const ServiceList = () => {
   if (error) {
     return (
       <div className="service-list-page">
-        <div className="service-list-header">
-          <h1>Service List</h1>
-        </div>
+        <PageHeader className="service-list-header" title="Service List" />
         <div className="service-list-error">
           <p>Failed to load services: {error}</p>
           <button onClick={() => window.location.reload()}>Retry</button>
@@ -164,15 +161,10 @@ const ServiceList = () => {
 
   return (
     <div className="service-list-page">
-      <div className="service-list-header">
-        <h1>Service List</h1>
-      </div>
+      <PageHeader className="service-list-header" title="Service List" />
 
       <div className="service-list-controls">
-        <div className="search-box">
-          <input type="text" placeholder="" aria-label="Search" />
-          <i className="bi bi-search"></i>
-        </div>
+        <SearchBox className="search-box" placeholder="" ariaLabel="Search" />
 
         <div className="filter-group">
           <button className="filter-btn" type="button">
@@ -211,20 +203,25 @@ const ServiceList = () => {
 
               return (
                 <div className="service-table-row" key={row.id}>
-                  <div>{row.service_number || `SR-${row.id}`}</div>
-                  <div>{deviceInfo.serial_number || '-'}</div>
-                  <div>{firstDetail?.service_type?.name || row.service_type?.name || '-'}</div>
-                  <div>
+                  <div data-label="No. Service">{row.service_number || `SR-${row.id}`}</div>
+                  <div data-label="Serial Number">{deviceInfo.serial_number || '-'}</div>
+                  <div data-label="Jenis Service">{firstDetail?.service_type?.name || row.service_type?.name || '-'}</div>
+                  <div data-label="Tanggal">
                     <div className="date-pill">
                       <span>{formatDate(row.request_date || row.created_at)}</span>
                       <i className="bi bi-calendar3"></i>
                     </div>
                   </div>
-                  <div className="service-desc">{firstDetail?.complaint || '-'}</div>
-                  <div className={`status-pill status-${(row.status?.name || 'pending').toLowerCase().replace(/\s+/g, '-')}`}>
+                  <div className="service-desc" data-label="Keterangan">{firstDetail?.complaint || '-'}</div>
+                  <div
+                    data-label="Status"
+                    className={`status-pill status-${(row.status?.name || 'pending')
+                      .toLowerCase()
+                      .replace(/\s+/g, '-')}`}
+                  >
                     {row.status?.name || 'Pending'}
                   </div>
-                  <div className="service-actions">
+                  <div className="service-actions" data-label="Aksi">
                     <button className="ellipsis-btn" type="button" aria-label="Menu">
                       ...
                     </button>
@@ -243,29 +240,17 @@ const ServiceList = () => {
           </div>
 
           {pagination && (
-            <div className="pagination">
-              <button
-                className="pagination-btn"
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-              >
-                <i className="bi bi-chevron-left"></i>
-                Prev
-              </button>
-
-              <span className="pagination-info">
-                Page {pagination.current_page} of {pagination.last_page}
-              </span>
-
-              <button
-                className="pagination-btn"
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage >= pagination.last_page}
-              >
-                Next
-                <i className="bi bi-chevron-right"></i>
-              </button>
-            </div>
+            <TablePagination
+              wrapperClassName="pagination"
+              buttonClassName="pagination-btn"
+              infoClassName="pagination-info"
+              currentPage={pagination.current_page}
+              totalPages={pagination.last_page}
+              onPrev={() => handlePageChange(currentPage - 1)}
+              onNext={() => handlePageChange(currentPage + 1)}
+              disablePrev={currentPage === 1}
+              disableNext={currentPage >= pagination.last_page}
+            />
           )}
         </>
       )}

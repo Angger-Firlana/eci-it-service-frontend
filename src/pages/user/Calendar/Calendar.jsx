@@ -5,6 +5,7 @@ import { authenticatedRequest } from '../../../lib/api';
 import { useServiceCache } from '../../../contexts/ServiceCacheContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { getServiceRequestDetailCached } from '../../../lib/serviceRequestCache';
+import { PageHeader } from '../../../components/ui';
 
 const Calendar = () => {
   const navigate = useNavigate();
@@ -171,7 +172,7 @@ const Calendar = () => {
 
   return (
     <div className="calendar-page">
-      <h1>Kalender</h1>
+      <PageHeader title="Kalender" />
 
       {isLoading && (
         <div className="calendar-loading">Loading calendar data...</div>

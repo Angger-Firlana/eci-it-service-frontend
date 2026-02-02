@@ -208,3 +208,13 @@
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 520px) {
+  .admin-calendar-card {
+    padding: 14px 16px 18px;
+  }
+
+  .admin-calendar-day {
+    height: 48px;
+  }
+}

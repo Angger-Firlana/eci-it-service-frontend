@@ -165,3 +165,46 @@
     min-width: 720px;
   }
 }
+
+@media (max-width: 720px) {
+  .admin-inbox-controls {
+    width: 100%;
+  }
+
+  .admin-search-box {
+    width: 100%;
+  }
+
+  .admin-inbox-table {
+    overflow: hidden;
+  }
+
+  .admin-inbox-head {
+    display: none;
+  }
+
+  .admin-inbox-row {
+    min-width: 0;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 14px;
+  }
+
+  .admin-inbox-row > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .admin-inbox-row > div::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #9D9D9D;
+    flex: 0 0 120px;
+  }
+
+  .admin-actions {
+    justify-content: flex-start;
+  }
+}

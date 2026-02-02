@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import '../../user/Calendar/Calendar.css';
 import { authenticatedRequest, unwrapApiData } from '../../../lib/api';
 import { getServiceRequestDetailCached } from '../../../lib/serviceRequestCache';
+import { PageHeader } from '../../../components/ui';
+import globalCache from '../../../lib/globalCache';
 
 // Vendor approval status IDs (entity_type_id = 2)
 const APPROVAL_STATUS = {
@@ -30,6 +32,15 @@ const Calendar = () => {
     let cancelled = false;
 
     const fetchApprovalServices = async () => {
+      const cacheKey = 'atasan-calendar:services';
+      const cached = globalCache.get(cacheKey);
+
+      if (cached) {
+        setServices(cached.services || cached);
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
 
       console.log('[Atasan/Calendar] Fetching approval services...');
@@ -101,6 +112,7 @@ const Calendar = () => {
           });
 
         setServices(enrichedServices);
+        globalCache.set(cacheKey, { services: enrichedServices }, 2 * 60 * 1000);
         console.log('[Atasan/Calendar] Loaded', enrichedServices.length, 'services');
       } catch (err) {
         if (err?.name === 'AbortError') return;
@@ -246,7 +258,7 @@ const Calendar = () => {
 
   return (
     <div className="calendar-page">
-      <h1>Kalender</h1>
+      <PageHeader title="Kalender" />
 
       {isLoading && (
         <div className="calendar-loading">Memuat kalender...</div>
