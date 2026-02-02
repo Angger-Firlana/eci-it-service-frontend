@@ -36,9 +36,6 @@ export const unwrapApiData = (payload) => {
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000, // 30 second timeout
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 // Response interceptor for consistent error handling
@@ -86,9 +83,13 @@ export const apiRequest = async (path, options = {}) => {
     // Handle different body types
     if (body instanceof FormData) {
       config.data = body;
-      delete config.headers['Content-Type']; // Let axios set multipart boundary
+      // Let axios set multipart boundary automatically
     } else if (body !== undefined) {
-      config.data = body; // Axios auto-serializes to JSON
+      config.data = body;
+      // Set default JSON content type for object payloads if not already specified
+      if (!config.headers['Content-Type']) {
+        config.headers['Content-Type'] = 'application/json';
+      }
     }
 
     const response = await axiosInstance.request(config);
