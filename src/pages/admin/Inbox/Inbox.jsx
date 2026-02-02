@@ -5,6 +5,7 @@ import eyeIcon from '../../../assets/icons/lihatdetail(eye).svg';
 import { authenticatedRequest, unwrapApiData } from '../../../lib/api';
 import { getStatusMapsCached } from '../../../lib/referenceCache';
 import { getServiceRequestDetailCached } from '../../../lib/serviceRequestCache';
+import globalCache from '../../../lib/globalCache';
 
 const formatDate = (value) => {
   if (!value) return '-';
@@ -119,6 +120,16 @@ const Inbox = () => {
     let cancelled = false;
 
     const fetchInbox = async () => {
+      // Check cache first
+      const cacheKey = 'admin-inbox:list';
+      const cached = globalCache.get(cacheKey);
+      
+      if (cached) {
+        setItems(cached.items);
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       setError('');
 
@@ -166,6 +177,8 @@ const Inbox = () => {
 
         if (!cancelled) {
           setItems(enriched);
+          // Cache the result (30s for inbox)
+          globalCache.set(cacheKey, { items: enriched }, 30_000);
         }
       } catch (err) {
         if (err?.name === 'AbortError') return;

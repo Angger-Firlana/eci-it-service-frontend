@@ -8,6 +8,7 @@ import {
   getServiceRequestDetailCached,
   getServiceRequestLocationsCached,
 } from '../../../lib/serviceRequestCache';
+import globalCache from '../../../lib/globalCache';
 
 const PER_PAGE = 10;
 
@@ -95,6 +96,17 @@ const ServiceList = ({ onViewDetail } = {}) => {
     let cancelled = false;
 
     const fetchServices = async () => {
+      // Check cache first
+      const cacheKey = `admin-service-list:${currentPage}:${querySearch}`;
+      const cached = globalCache.get(cacheKey);
+      
+      if (cached) {
+        setRows(cached.rows);
+        setPagination(cached.pagination);
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       setError('');
 
@@ -168,16 +180,20 @@ const ServiceList = ({ onViewDetail } = {}) => {
         });
 
         if (cancelled) return;
+        
+        const paginationData = meta
+          ? {
+              current_page: meta.current_page,
+              last_page: meta.last_page,
+              total: meta.total,
+            }
+          : null;
+        
         setRows(computedRows);
-        setPagination(
-          meta
-            ? {
-                current_page: meta.current_page,
-                last_page: meta.last_page,
-                total: meta.total,
-              }
-            : null
-        );
+        setPagination(paginationData);
+        
+        // Cache the result (30s)
+        globalCache.set(cacheKey, { rows: computedRows, pagination: paginationData }, 30_000);
       } catch (err) {
         if (cancelled) return;
         if (err?.name === 'AbortError') return;

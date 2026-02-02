@@ -83,22 +83,27 @@
   justify-content: center;
   position: relative;
   border-radius: 14px;
+  transition: background-color 0.2s ease;
 }
 
-.admin-calendar-day.selected {
-  border: 1.5px solid #3b3b3b;
+.admin-calendar-day:not(.empty):hover {
+  background-color: #F3F4F6;
 }
 
-.admin-calendar-day.selected::before {
+.admin-calendar-day.has-event::after {
   content: '';
   width: 5px;
   height: 5px;
   background: #FF2D2D;
   border-radius: 999px;
   position: absolute;
-  top: 10px;
+  bottom: 10px;
   left: 50%;
   transform: translateX(-50%);
+}
+
+.admin-calendar-day.selected {
+  border: 1.5px solid #3b3b3b;
 }
 
 .admin-calendar-day.empty {
@@ -128,6 +133,13 @@
   gap: 4px;
   font-size: 12px;
   background: #FAFAFA;
+  transition: all 0.2s ease;
+}
+
+.admin-side-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: #3B82F6;
 }
 
 .admin-side-title-row {
@@ -141,12 +153,54 @@
 
 .admin-side-status {
   font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* Color coding for different actions */
+.admin-side-status.approve {
+  color: #DC2626;
+  background: #FEE2E2;
+}
+
+.admin-side-status.location {
+  color: #16A34A;
+  background: #DCFCE7;
+}
+
+.admin-side-status.atasan {
+  color: #2563EB;
+  background: #DBEAFE;
+}
+
+.admin-side-status.complete {
+  color: #9333EA;
+  background: #F3E8FF;
+}
+
+.admin-side-status.completed {
+  color: #6B7280;
+  background: #F3F4F6;
+}
+
+.admin-side-status.default {
   color: #FF2D2D;
+  background: #FEE2E2;
 }
 
 .admin-side-sub {
   font-size: 11px;
   color: #9D9D9D;
+}
+
+.admin-side-loading,
+.admin-side-empty {
+  text-align: center;
+  padding: 20px;
+  color: #9D9D9D;
+  font-size: 12px;
 }
 
 @media (max-width: 900px) {

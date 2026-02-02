@@ -2,42 +2,25 @@ import React, { useEffect, useMemo, useState } from 'react';
 import './MasterData.css';
 import { Modal } from '../../../components/common';
 import { authenticatedRequest, unwrapApiData, API_BASE_URL } from '../../../lib/api';
+import globalCache from '../../../lib/globalCache';
 
-const CACHE_TTL_MS = 5 * 60 * 1000;
-const CACHE_KEYS = {
-  deviceTypes: 'eci-masterdata-device-types',
-  deviceModels: 'eci-masterdata-device-models',
-  serviceTypes: 'eci-masterdata-service-types',
-  vendors: 'eci-masterdata-vendors',
-  departments: 'eci-masterdata-departments',
-};
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes for master data
 
-const readCache = (key) => {
-  if (typeof window === 'undefined') return null;
-  const raw = window.localStorage.getItem(key);
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw);
-    if (!parsed || !Array.isArray(parsed.data) || !parsed.ts) return null;
-    if (Date.now() - parsed.ts > CACHE_TTL_MS) return null;
-    return parsed.data;
-  } catch (error) {
-    return null;
-  }
-};
-
+// Wrapper functions to use globalCache
+const readCache = (key) => globalCache.get(key);
 const writeCache = (key, data) => {
-  if (typeof window === 'undefined') return;
   const safeData = Array.isArray(data)
     ? data.filter((item) => !item?.__optimistic)
     : [];
-  window.localStorage.setItem(
-    key,
-    JSON.stringify({
-      ts: Date.now(),
-      data: safeData,
-    })
-  );
+  globalCache.set(key, safeData, CACHE_TTL_MS);
+};
+
+const CACHE_KEYS = {
+  deviceTypes: 'master-data:device-types',
+  deviceModels: 'master-data:device-models',
+  serviceTypes: 'master-data:service-types',
+  vendors: 'master-data:vendors',
+  departments: 'master-data:departments',
 };
 
 const MasterData = () => {

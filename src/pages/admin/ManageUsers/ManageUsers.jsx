@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import './ManageUsers.css';
 
 import { Modal } from '../../../components/common';
 import { authenticatedRequest, unwrapApiData } from '../../../lib/api';
+import globalCache from '../../../lib/globalCache';
 
 const ManageUsers = () => {
   const [activeTab, setActiveTab] = useState('user');
@@ -11,11 +12,14 @@ const ManageUsers = () => {
   const [roles, setRoles] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [departmentId, setDepartmentId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [selectedId, setSelectedId] = useState(null);
+  
+  const searchTimeoutRef = useRef(null);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createError, setCreateError] = useState('');
@@ -109,6 +113,23 @@ const ManageUsers = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Debounce search input
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [search]);
+
   useEffect(() => {
     const roleId = getRoleIdsForTab(activeTab)[0] || '';
     const defaultDepartmentId = departments[0]?.id ? String(departments[0].id) : '';
@@ -124,6 +145,20 @@ const ManageUsers = () => {
     if (!roleIds.length) return;
 
     const fetchUsers = async () => {
+      // Check cache first
+      const cacheKey = `manage-users:${activeTab}:${departmentId}:${debouncedSearch}`;
+      const cached = globalCache.get(cacheKey);
+      
+      if (cached) {
+        setUsers(cached.users);
+        setMeta(cached.meta);
+        setSelectedId((prev) => {
+          if (prev && cached.users.some((u) => u.id === prev)) return prev;
+          return cached.users[0]?.id ?? null;
+        });
+        return;
+      }
+
       setIsLoading(true);
       setError('');
       try {
@@ -131,7 +166,7 @@ const ManageUsers = () => {
           const params = new URLSearchParams();
           params.set('per_page', '50');
           params.set('role_id', String(rid));
-          if (search.trim()) params.set('search', search.trim());
+          if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
           if (departmentId) params.set('department_id', String(departmentId));
           return params;
         };
@@ -163,8 +198,16 @@ const ManageUsers = () => {
         // Stable-ish ordering so the table doesn't jump around.
         list.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
 
+        const metaData = { total: total || list.length };
+        
+        // Cache the result
+        globalCache.set(cacheKey, {
+          users: list,
+          meta: metaData,
+        });
+
         setUsers(list);
-        setMeta({ total: total || list.length });
+        setMeta(metaData);
 
         setSelectedId((prev) => {
           if (prev && list.some((u) => u.id === prev)) return prev;
@@ -181,7 +224,7 @@ const ManageUsers = () => {
     };
 
     fetchUsers();
-  }, [activeTab, departmentId, search, roles]);
+  }, [activeTab, departmentId, debouncedSearch, roles]);
 
   useEffect(() => {
     if (!selectedRow) {
@@ -249,6 +292,9 @@ const ManageUsers = () => {
         };
       })
     );
+    
+    // Clear manage-users cache
+    globalCache.deletePattern(/^manage-users:/);
 
     setIsSaving(true);
     setError('');
@@ -278,6 +324,17 @@ const ManageUsers = () => {
     const confirmed = window.confirm(`Hapus user "${selectedRow.name}"?`);
     if (!confirmed) return;
 
+    const prevUsers = users;
+    const prevSelectedId = selectedId;
+    
+    // Optimistic delete: remove immediately
+    const nextUsers = users.filter((u) => u.id !== selectedRow.id);
+    setUsers(nextUsers);
+    setSelectedId(nextUsers[0]?.id ?? null);
+    
+    // Clear manage-users cache
+    globalCache.deletePattern(/^manage-users:/);
+
     setIsSaving(true);
     setError('');
     try {
@@ -287,13 +344,10 @@ const ManageUsers = () => {
       if (!res.ok || res.data?.success === false) {
         throw new Error(getErrorMessage(res.data));
       }
-
-      setUsers((prev) => {
-        const next = prev.filter((u) => u.id !== selectedRow.id);
-        setSelectedId(next[0]?.id ?? null);
-        return next;
-      });
     } catch (err) {
+      // Rollback on error
+      setUsers(prevUsers);
+      setSelectedId(prevSelectedId);
       setError(err.message || 'Gagal menghapus user');
     } finally {
       setIsSaving(false);
@@ -336,6 +390,25 @@ const ManageUsers = () => {
       return;
     }
 
+    // Optimistic create: add placeholder user immediately
+    const optimisticRole = roles.find((r) => r.id === payload.role_id);
+    const optimisticDept = departments.find((d) => d.id === payload.department_id);
+    const tempId = `temp-${Date.now()}`;
+    const optimisticUser = {
+      id: tempId,
+      name: payload.name,
+      email: payload.email,
+      roles: optimisticRole ? [optimisticRole] : [],
+      departments: optimisticDept ? [optimisticDept] : [],
+      __optimistic: true,
+    };
+    
+    setUsers((prev) => [optimisticUser, ...prev]);
+    setSelectedId(tempId);
+    
+    // Clear manage-users cache
+    globalCache.deletePattern(/^manage-users:/);
+
     setIsSaving(true);
     setCreateError('');
     try {
@@ -349,11 +422,15 @@ const ManageUsers = () => {
 
       const created = unwrapApiData(res.data);
       if (created?.id) {
-        setUsers((prev) => [created, ...prev]);
+        // Replace optimistic user with real one
+        setUsers((prev) => prev.map((u) => u.id === tempId ? created : u));
         setSelectedId(created.id);
       }
       closeCreate();
     } catch (err) {
+      // Remove optimistic user on error
+      setUsers((prev) => prev.filter((u) => u.id !== tempId));
+      setSelectedId(users[0]?.id ?? null);
       setCreateError(err.message || 'Gagal membuat user');
     } finally {
       setIsSaving(false);

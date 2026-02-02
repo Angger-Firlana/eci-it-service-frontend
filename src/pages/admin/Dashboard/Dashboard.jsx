@@ -7,6 +7,7 @@ import adminMascot from '../../../assets/images/admin_maskot.png';
 
 import { authenticatedRequest } from '../../../lib/api';
 import { getServiceRequestDetailCached } from '../../../lib/serviceRequestCache';
+import globalCache from '../../../lib/globalCache';
 
 const PENDING_STATUS_ID = 1;
 
@@ -76,6 +77,16 @@ const Dashboard = ({ user }) => {
     };
 
     const fetchDashboardData = async () => {
+      // Check cache first
+      const cacheKey = `admin-dashboard:${adminId || 'no-admin'}`;
+      const cached = globalCache.get(cacheKey);
+      
+      if (cached) {
+        setRequests(cached.requests);
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       setError('');
 
@@ -130,7 +141,12 @@ const Dashboard = ({ user }) => {
         );
 
         if (cancelled) return;
-        setRequests(enrichedTop.map(transformServiceRequest));
+        
+        const transformedRequests = enrichedTop.map(transformServiceRequest);
+        setRequests(transformedRequests);
+        
+        // Cache the result
+        globalCache.set(cacheKey, { requests: transformedRequests }, 30_000); // 30s cache for dashboard
       } catch (err) {
         if (cancelled) return;
         setError(err.message || 'Failed to load dashboard');
