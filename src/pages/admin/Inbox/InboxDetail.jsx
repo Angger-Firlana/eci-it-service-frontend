@@ -266,8 +266,24 @@ const serviceStatusCode = serviceStatus?.code || '';
 
   const deviceInfo = useMemo(() => getDeviceInfo(detail), [detail]);
 
-  const departmentLabel =
-    detail?.user?.departments?.[0]?.name || detail?.user?.department?.name || '-';
+  // Get actual creator from audit logs (for requests created by admin)
+  const actualCreator = useMemo(() => {
+    const logs = Array.isArray(detail?.audit_logs) ? detail.audit_logs : [];
+    const createLog = logs.find(log => log?.action === 'CREATE_REQUEST');
+    return createLog?.actor || detail?.user || null;
+  }, [detail]);
+
+  // Get department from actual creator (works for both user and admin created requests)
+  const departmentLabel = 
+    actualCreator?.departments?.[0]?.name || 
+    actualCreator?.department?.name || 
+    detail?.user?.departments?.[0]?.name || 
+    detail?.user?.department?.name ||
+    detail?.admin?.departments?.[0]?.name || 
+    detail?.admin?.department?.name ||
+    '-';
+  
+  const requesterName = actualCreator?.name || detail?.user?.name || '-';
 
   const vendorOptionById = useMemo(() => {
     const map = new Map();
@@ -327,20 +343,7 @@ const serviceStatusCode = serviceStatus?.code || '';
     const items = [];
     const seenIds = new Set();
     const createdAt = detail?.created_at || detail?.request_date;
-    const requesterName = detail?.user?.name || 'User';
     const currentStatusCode = serviceStatusById.get(Number(detail?.status_id))?.code || '';
-
-    // Always add creation entry first
-    if (createdAt) {
-      items.push({
-        id: 'created',
-        label: 'Menunggu Approval',
-        date: createdAt,
-        note: `Request dibuat oleh ${requesterName}`,
-        state: 'active',
-      });
-      seenIds.add('created');
-    }
 
     // Process audit_logs to build timeline
     const logs = Array.isArray(detail?.audit_logs) ? [...detail.audit_logs] : [];
@@ -349,6 +352,22 @@ const serviceStatusCode = serviceStatus?.code || '';
       const bTime = new Date(b?.created_at || 0).getTime();
       return aTime - bTime;
     });
+
+    // Find CREATE_REQUEST log to get actual creator name
+    const createLog = logs.find(log => log?.action === 'CREATE_REQUEST');
+    const creatorName = createLog?.actor?.name || detail?.user?.name || 'User';
+
+    // Always add creation entry first
+    if (createdAt) {
+      items.push({
+        id: 'created',
+        label: 'Menunggu Approval',
+        date: createdAt,
+        note: `Request dibuat oleh ${creatorName}`,
+        state: 'active',
+      });
+      seenIds.add('created');
+    }
 
     for (const log of logs) {
       // Skip CREATE_REQUEST action - we already added creation entry
@@ -449,7 +468,13 @@ const serviceStatusCode = serviceStatus?.code || '';
   }, [allStatusById, detail, serviceStatusById]);
 
   const setLocationFormValue = (field) => (event) => {
-    const value = event?.target?.value;
+    let value = event?.target?.value;
+    
+    // Kode Pos: numbers only
+    if (field === 'postalCode') {
+      value = value.replace(/[^0-9]/g, '');
+    }
+    
     setLocationForm((prev) => ({
       ...prev,
       [field]: value,
@@ -459,6 +484,7 @@ const serviceStatusCode = serviceStatus?.code || '';
   const openLocationModal = (forceType = null, freshInput = false) => {
     setLocationError('');
 
+    // Default to 'internal' (Workshop) if no active location
     const nextType = forceType || (activeLocation?.location_type === 'external' ? 'external' : 'internal');
 
     if (freshInput) {
@@ -702,13 +728,15 @@ const serviceStatusCode = serviceStatus?.code || '';
       const province = String(locationForm.province || '').trim();
       const postalCode = String(locationForm.postalCode || '').trim();
       const mapsUrl = String(locationForm.mapsUrl || '').trim();
-      if (!address || !city || !province || !postalCode || !mapsUrl) {
-        throw new Error('Alamat vendor harus lengkap (alamat, kota, provinsi, kode pos, link maps)');
+      
+      // Maps URL is optional, other fields are required
+      if (!address || !city || !province || !postalCode) {
+        throw new Error('Alamat vendor harus lengkap (alamat, kota, provinsi, kode pos)');
       }
 
-      const normalizedMapsUrl = /^https?:\/\//i.test(mapsUrl)
+      const normalizedMapsUrl = mapsUrl && /^https?:\/\//i.test(mapsUrl)
         ? mapsUrl
-        : `https://${mapsUrl}`;
+        : mapsUrl ? `https://${mapsUrl}` : '';
 
       const fee = parseCurrencyNumber(locationForm.serviceFee);
       const cancelFee = parseCurrencyNumber(locationForm.cancellationFee);
@@ -716,18 +744,24 @@ const serviceStatusCode = serviceStatus?.code || '';
         throw new Error('Biaya service wajib diisi');
       }
 
+      const locationPayload = {
+        location_type: 'external',
+        vendor_id: Number(vendorId),
+        address,
+        city,
+        province,
+        postal_code: postalCode,
+        is_active: true,
+      };
+      
+      // Only include maps_url if provided
+      if (normalizedMapsUrl) {
+        locationPayload.maps_url = normalizedMapsUrl;
+      }
+
       const locationRes = await authenticatedRequest(`/service-requests/${id}/locations`, {
         method: 'POST',
-        body: {
-          location_type: 'external',
-          vendor_id: Number(vendorId),
-          address,
-          city,
-          province,
-          postal_code: postalCode,
-          maps_url: normalizedMapsUrl,
-          is_active: true,
-        },
+        body: locationPayload,
       });
       if (!locationRes.ok) {
         throw new Error(getErrorMessage(locationRes.data, 'Gagal set lokasi vendor'));
@@ -965,7 +999,7 @@ const serviceStatusCode = serviceStatus?.code || '';
 
             <div className="admin-detail-row">
               <span className="admin-detail-key">Requester</span>
-              <span className="admin-detail-value">{detail.user?.name || '-'}</span>
+              <span className="admin-detail-value">{requesterName}</span>
             </div>
             <div className="admin-detail-row">
               <span className="admin-detail-key">Perangkat</span>
@@ -1383,14 +1417,12 @@ const serviceStatusCode = serviceStatus?.code || '';
 
         <div className="admin-modal-field">
           <label>Estimasi Tanggal Selesai</label>
-          <div className="admin-modal-input">
-            <input
-              type="date"
-              value={locationForm.estimatedDate}
-              onChange={setLocationFormValue('estimatedDate')}
-            />
-            <i className="bi bi-calendar3"></i>
-          </div>
+          <input
+            type="date"
+            value={locationForm.estimatedDate}
+            onChange={setLocationFormValue('estimatedDate')}
+            min={new Date().toISOString().split('T')[0]}
+          />
         </div>
 
         {locationType === 'external' && (

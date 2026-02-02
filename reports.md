@@ -58,3 +58,44 @@ Changes 8
   - NOT allowed for `REJECTED` and `CANCELLED`
 - note: Stored Invoice creation still happens on `COMPLETED`; preview invoice is independent.
 ----------
+
+Changes 9
+- **Bug Fix: Admin-Created Request Shows Wrong Requester & Department**
+- **Frontend Changes** (`src/pages/admin/Inbox/InboxDetail.jsx`):
+  - Added `actualCreator` useMemo to extract creator from audit logs `CREATE_REQUEST` action's `actor` field
+  - Updated `departmentLabel` to prioritize `actualCreator.departments` over `detail.user.departments`
+  - Updated `requesterName` to use `actualCreator.name` instead of `detail.user.name`
+  - This ensures when admin creates request, their name and department are shown (not "User" or "-")
+  
+- **Backend Changes** (for department eager loading):
+  - **File**: `app/Services/AuditLogService.php`
+    - Updated `getAuditLogsForServiceRequest()` to eager load `actor.departments:id,name` (was only loading `actor:id,name`)
+    - This populates department data in audit log actor objects
+  
+  - **File**: `app/Services/ServiceRequest/ServiceRequestService.php`
+    - Added `'admin.departments:id,name'` to `showWith()` method
+    - This ensures admin's department is loaded when admin is assigned to service request
+  
+- **Other Fixes in Same Session**:
+  - Fixed Kode Pos validation: Now accepts numbers only (strips non-numeric chars)
+  - Fixed date picker: Removed duplicate calendar icon wrapper
+  - Added date validation: Cannot select dates before today (min attribute)
+  - Timeline now shows actual creator name instead of generic "User"
+
+- **Impact**: Admin-created requests now correctly display admin name and department in Detail Request card and Timeline
+----------
+
+Changes 10
+- **UI/UX Improvements: Location Modal Defaults & Validation**
+- **Frontend Changes** (`src/pages/admin/Inbox/InboxDetail.jsx`):
+  - **Default Location Type**: Location type now defaults to "Workshop IT (Internal)" when opening the modal (line 141 - state already set to 'internal')
+  - **Google Maps URL Optional**: 
+    - Removed `mapsUrl` from required validation (line 731-733)
+    - Updated error message to not mention "link maps"
+    - Modified payload to only include `maps_url` if value is provided (line 747-759)
+    - Updated URL normalization to handle empty string (line 735-738)
+  
+- **Impact**: 
+  - Users no longer need to enter Google Maps URL for vendor locations (it's now optional)
+  - Modal opens with Workshop (Internal) selected by default for better UX
+----------
