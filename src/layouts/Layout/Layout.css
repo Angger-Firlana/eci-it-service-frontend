@@ -43,7 +43,7 @@
 
 @media (max-width: 520px) {
   .app {
-    grid-template-columns: var(--sidebarMini) 1fr;
+    grid-template-columns: 1fr;
     padding: 14px;
   }
 }

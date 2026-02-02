@@ -22,14 +22,22 @@ const Sidebar = ({
   const isMobile = windowWidth <= 520;
   const isTablet = windowWidth <= 900 && windowWidth > 520;
 
-  const showLabel = !isTablet && (!isMobile || !isCollapsed);
+  const isDrawerOpen = isMobile && !isCollapsed;
+  const showLabel = !isTablet && (!isMobile || isDrawerOpen);
+  const handleNavClick = () => {
+    if (isMobile && !isCollapsed) {
+      onToggle?.();
+    }
+  };
 
   return (
-    <aside
-      className={`sidebar ${isMobile && isCollapsed ? 'sidebar-mini' : ''} ${
-        isMobile && !isCollapsed ? 'sidebar-drawer-open' : ''
-      } ${isTablet ? 'sidebar-compact' : ''}`}
-    >
+    <>
+      {isDrawerOpen && <div className="sidebar-overlay" onClick={onToggle} />}
+      <aside
+        className={`sidebar ${isMobile && isCollapsed ? 'sidebar-mini' : ''} ${
+          isMobile && !isCollapsed ? 'sidebar-drawer-open' : ''
+        } ${isTablet ? 'sidebar-compact' : ''}`}
+      >
       {/* Logo Section */}
       <div className="sidebar-top">
         {isMobile && (
@@ -81,6 +89,7 @@ const Sidebar = ({
             <Link
               key={item.id}
               to={linkTo}
+              onClick={handleNavClick}
               className={`nav-item ${isActive ? 'active' : ''} ${
                 isTablet || (isMobile && isCollapsed) ? 'nav-item-centered' : ''
               } ${hasBadge ? 'nav-item-badge' : ''}`}
@@ -96,7 +105,8 @@ const Sidebar = ({
           );
         })}
       </nav>
-    </aside>
+      </aside>
+    </>
   );
 };
 
