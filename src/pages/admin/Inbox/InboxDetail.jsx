@@ -391,8 +391,18 @@ const serviceStatusCode = serviceStatus?.code || '';
           : `Disetujui oleh ${actorName}`;
         seenIds.add('APPROVED_BY_ADMIN');
       } else if (statusCode === 'IN_PROGRESS') {
-        label = 'Dalam Proses';
-        note = log?.notes || 'Barang sedang diservis';
+        // Check notes to determine if it's location change or status change
+        const notes = log?.notes || '';
+        if (notes.includes('Dipindah ke vendor') || notes.includes('Diset ke vendor')) {
+          label = 'Dalam Proses';
+          note = 'Diset ke vendor (eksternal)';
+        } else if (notes.includes('Dipindah ke workshop') || notes.includes('Diset ke workshop')) {
+          label = 'Dalam Proses';
+          note = 'Dipindah ke workshop (internal)';
+        } else {
+          label = 'Dalam Proses';
+          note = 'Barang sedang diservis';
+        }
         seenIds.add('IN_PROGRESS');
       } else if (statusCode === 'COMPLETED') {
         label = 'Selesai';
@@ -1097,14 +1107,15 @@ const serviceStatusCode = serviceStatus?.code || '';
 
           {needsLocationSet && (
             <section className="admin-action-card">
-              <h2>Set Lokasi Service</h2>
+              <h2>Pilih Lokasi Service</h2>
+              <p>Pilih lokasi workshop atau vendor untuk service</p>
               <button
                 className="admin-action-primary"
                 type="button"
                 onClick={openLocationModal}
               >
                 <i className="bi bi-geo-alt"></i>
-                Set Lokasi
+                Pilih Lokasi
               </button>
             </section>
           )}

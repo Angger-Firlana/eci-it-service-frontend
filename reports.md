@@ -98,4 +98,26 @@ Changes 10
 - **Impact**: 
   - Users no longer need to enter Google Maps URL for vendor locations (it's now optional)
   - Modal opens with Workshop (Internal) selected by default for better UX
+  - **Note**: Backend still requires `maps_url` for external locations - needs backend permission to make fully optional
+----------
+
+Changes 11
+- **UI Fixes: Action Card Labels & Timeline Display**
+- **Frontend Changes** (`src/pages/admin/Inbox/InboxDetail.jsx`):
+  - **Action Card Label Fix** (line 1098-1111):
+    - Changed "Set Lokasi Service" to "Pilih Lokasi Service"
+    - Added description: "Pilih lokasi workshop atau vendor untuk service"
+    - Changed button text from "Set Lokasi" to "Pilih Lokasi"
+    - This makes it clearer that admin is choosing initial location, not moving
+  
+  - **Timeline Location Changes Fix** (line 393-406):
+    - Added logic to detect location change from audit log notes
+    - When `IN_PROGRESS` status + notes contain "Dipindah ke vendor" → shows "Diset ke vendor (eksternal)"
+    - When `IN_PROGRESS` status + notes contain "Dipindah ke workshop" → shows "Dipindah ke workshop (internal)"
+    - Fixes bug where timeline didn't show location change entries
+  
+- **Impact**: 
+  - Timeline now correctly shows when service is moved between vendor and workshop
+  - Action cards have clearer, more accurate labels
+  - Better UX - users understand what action they're taking
 ----------
